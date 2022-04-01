@@ -1,0 +1,25 @@
+---
+title: Security
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+To allow <%= vars.product_full %> to have network access you must create app security groups (ASGs).
+For more information, see [Networks, Security, and Assigning AZs](./installing.html#azs).
+
+VMware recommends the following best practices for security:
+
+* Run <%= vars.product_short %> in its own network.
+For more information, see [Creating Networks in <%= vars.ops_manager %>](https://docs.pivotal.io/pivotalcf/1-11/customizing/gcp-om-config.html#network).
+
+* Use <%= vars.product_short %> with the IPsec Add-on for PCF.
+For information about the IPsec Add-on for PCF, see [Securing Data in Transit with the IPsec Add-on](https://docs.pivotal.io/addon-ipsec/index.html).
+
+* Do not use a single <%= vars.product_short %> instance for multi-tenancy.
+A single Redis instance of the On-Demand service should only support a single workload.
+
+* Do not use the Shared-VM service for production use cases. It is not considered adequately secure for that purpose, even though it is designed for multi-tenancy.
+
+* Set TLS to **Optional** and encourage app developers to make use of the TLS port.
+  For more information, see [Using TLS](./appdevs.html#using-tls).

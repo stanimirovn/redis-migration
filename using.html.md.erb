@@ -1,0 +1,626 @@
+---
+title: Using Redis for VMware Tanzu Application Service
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+<%= vars.product_full %> can be used both through <a href="http://docs.pivotal.io/pivotalcf/console/dev-console.html">Apps Manager</a> and the Cloud Foundry Command Line Interface (cf CLI). Both methods are outlined below.
+
+You can find an example app has to help you get started with <%= vars.product_short %>.
+Download the example app by clicking [this link](https://github.com/pivotal-cf/cf-redis-example-app/archive/master.zip).
+
+For recommendations regarding <%= vars.product_short %> plans and memory allocation,
+see the [On-Demand Service Offering](./architecture.html)
+and the [Shared-VM Service Offering](./architecture-pp.html).
+
+## <a id="prereq"></a>Prerequisites
+
+<!-- The below partial is in https://github.com/pivotal-cf/docs-partials -->
+
+<%= partial vars.path_to_partials + "/services/developer-prereqs" %>
+
+## <a id="process"></a>Use <%= vars.product_short %> in an App
+
+Every app and service is scoped to a [space](http://docs.pivotal.io/pivotalcf/concepts/roles.html#spaces). To use a service,
+an app must exist in the same space as an instance of the service.
+
+To use <%= vars.product_short %> in an app:
+
+1. Use the [cf CLI](http://docs.pivotal.io/pivotalcf/cf-cli/getting-started.html#login) or [Apps Manager](http://docs.pivotal.io/pivotalcf/customizing/console-login.html) to log in to the org and space that contains the app.
+
+1. Make sure a <%= vars.product_short %> service instance exists in the same space as the app.<br><br>
+   - If the space does not already have a <%= vars.product_short %> instance, [create](#create) one.<br>
+   - If the space already has a <%= vars.product_short %> instance, you can [bind](#bind) your app to the existing instance or create a new instance to bind to your app.
+
+2. [Bind](#bind) the app to the <%= vars.product_short %> service instance, to enable the app to use Redis.
+
+## <a id='marketplace'></a>Confirm Service Availability
+
+For an app to use a service, the following two things must be true:
+
+* The service must be available in the Marketplace for its space.
+* An instance of the service must exist in its space.
+
+You can confirm both of these using the cf CLI as follows:
+
+1. To find out if a Redis service is available in the Marketplace:
+    1. Run:
+
+        ```
+        cf marketplace
+        ```
+    1. If the output lists `p.redis` in the `service` column, on-demand <%= vars.product_short %> is available.
+    If the output lists `p-redis` in the `service` column, shared-VM <%= vars.product_short %> is available.
+    If it is not available, ask your operator to install it.<br><br>
+    For example:
+    <pre class="terminal">
+    $ cf marketplace
+    Getting services from marketplace in org my-org / space my-space as user<span>@</span>example.com...
+    OK
+    service             plans                     description
+    p-redis             shared-vm                 Redis service to provide pre-provisioned instances configured as a datastore, running on a shared VM.
+    p.redis             on-demand-cache           Redis service to provide on-demand dedicated instances configured as a cache.
+    [...]
+    </pre>
+
+1. To confirm that a <%= vars.product_short %> instance is running in the space:
+    1. Run:
+
+        ```
+        cf services
+        ```
+    1. Any `p.redis` listings in the `service` column are service instances of on-demand <%= vars.product_short %> in the space.
+    Any `p-redis` in the `service` column are service instances of shared-VM <%= vars.product_short %>.<br><br>
+    For example:
+    <pre class="terminal">
+    $ cf services
+    Getting services in org my-org / space my-space as user<span>@</span>example.com...
+    OK
+    name          service     plan              bound apps    last operation
+    my-instance   p.redis     on-demand-cache                 create succeeded
+    </pre>
+
+You can [bind](#bind) your app to an existing instance or [create](#create) a new instance to bind to your app.
+
+
+## <a id='create'></a>Create a Service Instance
+
+To use a service you must create a service instance of a plan that is available in the Marketplace.
+To do so, you can use either the cf CLI or Apps Manager.
+
+### <a id='createcli'></a>Create a Service Instance with the cf CLI
+
+You can use the cf CLI to create service instances of available on-demand or shared-VM plans.
+
+#### On-Demand Service
+
+Unlike pre-provisioned services, on-demand instances are created asynchronously, not immediately.
+On-demand plans are listed under the `p.redis` service in the Marketplace.
+
+To create a service instance of the <%= vars.product_short %> on-demand plan, run:
+
+```
+cf create-service p.redis CACHE_PLAN SERVICE_NAME
+```
+
+where:
+
+* `CACHE_PLAN` is one of the plans configured by the operator.
+* `SERVICE_NAME` is a name for your service.
+
+<pre class="terminal">
+$ cf create-service p.redis on-demand-cache od-instance<br>
+Creating service my-ondemand-instance in org my-org / space my-space as user<span>@</span>example.com...
+OK<br>
+</pre>
+
+As the On-Demand instance can take longer to create, the `watch` command is helpful as a way to track when your service instance is ready to bind and use.
+
+<pre class="terminal">
+$ watch cf services<br>
+Getting services in org my-org / space my-space as user<span>@</span>example.com...
+OK
+name          service       plan              bound apps    last operation
+od-instance   p.redis       on-demand-cache                 create succeeded
+</pre>
+
+If you get an error, see [Troubleshooting Instances](./troubleshoot-instances.html). For information on the on-demand cache plans, see [On-Demand Service Plans](./architecture.html#on-demand).
+
+#### Shared-VM Service
+
+Shared-VM service instances have been pre-provisioned by the operator. This means, if an instance is available, the app developer can provision it immediately.
+These plans are both listed under the `p-redis` service in the Marketplace.
+
+<p class="note"><strong>Note</strong>: Shared-VM services are designed for testing and development purposes. Shared-VMs should not be used in production environments</p>
+
+To create a service instance of the <%= vars.product_short %> shared-VM plan, run:
+
+```
+cf create-service p-redis SERVICE_TYPE SERVICE_NAME
+```
+
+where:
+
+* `SERVICE_TYPE` is `shared-vm`.<br>
+* `SERVICE_NAME` is a name for your service instance.
+
+<pre class="terminal">
+$ cf create-service p-redis shared-vm my-instance<br>
+Creating service my-instance in org my-org / space my-space as user<span>@</span>example.com...
+OK<br>
+</pre>
+
+### <a id='createam'></a>Create a Service Instance with Apps Manager
+
+You can use Apps Manager to create service instances of available on-demand or shared-VM plans.
+
+
+#### On-Demand Service
+
+To create a service instance of the <%= vars.product_short %>  on-demand plan using Apps Manager:
+
+1. From within Apps Manager, select **Marketplace** from the left navigation menu.
+
+1. Select **Redis On-Demand** from the displayed tiles in the Marketplace.
+  ![Screenshot of the Marketplace in Apps Manager.
+  At the top of the page is a search bar.
+  Below this is a list of services available in the marketplace.
+  The service named 'Redis On-Demand' has been highlighted with a red box.](appsman_marketplace_od.png)
+  <a href="./images/appsman_marketplace_od.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+
+1. Click on the appropriate **Select this plan** button to select the required **Redis Service Plan**.
+  ![Screenshot of the On-Demand Redis service in Apps Manager.
+  The header contains a description of the on-demand Redis service.
+  Below the header on the left of the screenshot a service plan cache-large.
+  Below the header on the right of the screenshot is the service plan name cache-large
+  followed by a description of the plan.
+  Below this is the button for Select this Plan.](predis_marketplace.png)
+  <a href="./images/predis_marketplace.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+
+1. In the **Instance Name** field, enter a name that will identify this specific Redis service instance.
+  ![Screenshot of the On-Demand Redis service in Apps Manager.
+  The header contains a description of the on-demand Redis service.
+  Below the header on the left of the screenshot is the service plan name cache-large
+  followed by a description of the plan.
+  Below the header on the right of the screenshot is a section labeled Configure Instance.
+  This section has a field for Instance Name, a dropdown for Add to Space, and
+  a dropdown for Bind to App.
+  Below these fields, there is a Show Advanced Options button.
+  At the bottom of the Configure Instance section is a Cancel and an Add button.](predis_info.png)
+  <a href="./images/predis_info.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+
+1. From the **Add to Space** dropdown, select the space where you or other users will deploy the apps that will bind to the service.
+1. Click the **Add** button.
+
+#### Shared-VM Service
+
+To create a service instance of the <%= vars.product_short %> shared-VM plan using Apps Manager:
+
+1. From within Apps Manager, select **Marketplace** from the left navigation menu.
+
+1. Select **Redis** from the displayed tiles in the Marketplace.
+![Screenshot of the Marketplace in Apps Manager.
+At the top of the page is a search bar.
+Below this is a list of services available in the marketplace.
+The service named 'Redis' has been highlighted with a red box.](appsman_marketplace_shared.png)
+<a href="./images/appsman_marketplace_shared.png" target="_blank" aria-hidden="true">
+  Click here to view a larger version of this image</a>
+
+1. Click on the appropriate **Select this plan** button to select the required **Redis Service Plan**.
+![Screenshot of the Redis service in Apps Manager.
+The header contains a description of the Redis service.
+Below the header on the left of the screenshot a service plan shared-vm.
+Below the header on the right of the screenshot is the service plan name shared-vm
+followed by a description of the plan.
+Below this is the button for Select this Plan.](p-redis_marketplace.png)
+<a href="./images/p-redis_marketplace.png" target="_blank" aria-hidden="true">
+  Click here to view a larger version of this image</a>
+
+1. In the **Instance Name** field, enter a name that will identify this specific Redis service instance.
+![Screenshot of a shared VM Redis plan pane in Apps Manager.
+The header contains a description of the Redis service.
+Below the header on the left of the screenshot is the service plan name shared-vm
+followed by a description of the plan.
+Below the header on the right of the screenshot is a section labeled Configure Instance.
+This section has a field for Instance Name, a dropdown for Add to Space, and
+a dropdown for Bind to App.
+Below these fields, there is a Show Advanced Options button.
+At the bottom of the Configure Instance section is a Cancel and an Add button.](p-redis-info.png)
+<a href="./images/p-redis-info.png" target="_blank" aria-hidden="true">
+  Click here to view a larger version of this image</a>
+
+1. From the **Add to Space** dropdown, select the space where you or other users will deploy the apps that will bind to the service.
+1. Click the **Add** button.
+
+
+## <a id="bind"></a>Bind a Service Instance to Your App
+
+For an app to use a service, you must bind it to a service instance.
+You can use either the cf CLI or Apps Manager to do this.
+Bind the app after you push or re-push it using `cf push`.
+
+### <a id="bind-cli"></a> Bind a Service Instance with the cf CLI
+
+To bind an app to a <%= vars.product_short %> service instance:
+
+1. View running service instances:
+
+    ```
+    cf services
+    ```
+
+    For example:
+
+    <pre class=terminal>
+    $ cf services
+
+    Getting services in org system / space apps-manager as admin...
+    OK
+
+    name                service         plan        bound apps    last operation
+    my-instance   p-redis         shared-vm                 create succeeded
+    </pre>
+
+1. Bind the service instance to your app by running:
+
+    ```
+    cf bind-service APP-NAME SERVICE-INSTANCE
+    ```
+
+    Where:
+    * `APP` is the app you want to use the Redis service instance.<br>
+    * `SERVICE_INSTANCE` is the name you supplied when you ran `cf create-service`.
+
+    For example:
+
+    <pre class="terminal">
+   $ cf bind-service my-app my-instance<br>
+    Binding service my-instance to my-app in org my-org / space test as user<span>@</span>example.com...
+    OK
+    TIP: Use 'cf push' to ensure your env variable changes take effect
+</pre>
+
+### <a id="bind-appsman"></a> Bind a Service Instance with Apps Manager
+
+To bind an app to a <%= vars.product_short %> service instance:
+
+1. Select the app that you want to bind to the service. A page displays showing the already bound services and instances for this app.
+1. Click **Bind**. A list of available services displays.
+1. Click the **Bind** button for the Redis service you want to bind to this app.
+1. Start or restage your app from the command line, for example:
+
+    <pre class=terminal>
+    $ cf restage my-app
+    </pre>
+
+## <a id="custom"></a>Customize an On-Demand Service Instance
+
+The On-Demand Service allows operators and app developers to customize certain configuration variables.
+
+Operators can customize the memory size, org and space access, Redis Client Timeout (default 3600 seconds), Redis TCP Keepalive (default 60 seconds), Redis Max Clients (default 1000), and can enable Lua Scripting.
+
+App developers can customize the following parameters. See the <a href="https://redis.io/commands">Redis documentation</a> for more detail.
+
+<table border="1" class="nice">
+  <tr>
+    <th>Property</th>
+    <th>Default</th>
+    <th>Options</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td><code>maxmemory-policy</code></td>
+    <td><code>allkeys-lru</code></td>
+    <td><code>allkeys-lru</code>, <code>noeviction</code>, <code>volatile-lru</code>, <code>allkeys-random</code>, <code>volatile-ttl</code>, <code>volatile-lfu</code>, <code>allkeys-lfu</code></td>
+    <td>Sets the behavior Redis follows when <code>maxmemory</code> is reached</td>
+  </tr>
+  <tr>
+    <td><code>notify-keyspace-events</code></td>
+    <td>""</td>
+    <td>Set a combination of the following characters (e.g., <code>Elg</code>): K, E, g, $, l, s, h, z, x, e, A</td>
+    <td>Sets the keyspace notifications for events that affect the Redis data set</td>
+  </tr>
+  <tr>
+    <td><code>slowlog-log-slower-than</code></td>
+    <td>10000</td>
+    <td>0-20000</td>
+    <td>Sets the threshhold execution time (seconds). Commands that exceed this execution time are added to the slowlog.</td>
+  </tr>
+  <tr>
+    <td><code>slowlog-max-len</code></td>
+    <td>128</td>
+    <td>1-2024</td>
+    <td>Sets the length (count) of the slowlog queue.</td>
+  </tr>
+</table>
+
+### <a id="customize-cli"></a> Customize an On-Demand Instance with the cf CLI
+
+<p class="note"><strong>Note</strong>: Arbitrary parameters are only supported for on-demand service instances. Shared-VM plans do not support the use of CLI commands with arbitrary parameters to configure service instances.</p>
+
+You can customize an instance in two ways:
+
+* While creating the instance, run:
+
+    ```
+    cf create-service SERVICE PLAN NAME -c '{"PROPERTY":"SETTING"}'
+    ```
+* After creating the instance, run:
+
+    ```
+    cf update-service NAME -c '{"PROPERTY":"SETTING"}'
+    ```
+
+For both scenarios, the `-c` flag requires a valid JSON object containing service-specific configuration parameters, provided either in-line or in a file.
+
+<pre class=terminal>
+$ cf update-service my-instance -c '{"maxmemory-policy":"noeviction"}'
+</pre>
+
+You can pass through mutliple arbitrary parameters:
+
+<pre class=terminal>
+$ cf update-service my-instance -c '{"maxmemory-policy":"noeviction", "notify-keyspace-events":"El"}'
+</pre>
+
+If the update is not successful, an error is displayed with a description of what went wrong. Here is an example where a hyphen is added to the `noeviction` setting.
+<pre class=terminal>
+$ cf update-service my-instance -c '{"maxmemory-policy":"no-eviction", "notify-keyspace-events":"El"}'
+Updating service instance my-instance as admin...
+FAILED
+Server error, status code: 502, error code: 10001, message: Service broker error: invalid value "no-eviction" specified for maxmemory-policy
+</pre>
+
+### <a id="customize-appsman"></a> Customize an On-Demand Instance with the Apps Manager
+
+You can customize an instance in two ways:
+
+* While creating the instance, after you select the plan, click **advanced settings**.<br><br>
+  ![Screenshot of an on-demand Redis plan pane in Apps Manager.
+  The header contains a description of the Redis service.
+  Below the header on the left of the screenshot, there is the service plan name cache-large
+  followed by a description of the plan.
+  On the right of the screenshot, there is a section labeled Configure Instance.
+  This section has a field for Instance Name, a dropdown for Add to Space,
+  a dropdown for Bind to App, and two additional fields under the label Add Parameter.
+  To the right of the Add Parameter fields, there is a plus sign for adding more parameter fields.
+  Below these fields, there is a Hide Advanced Options button.
+  At the bottom of the Configure Instance section, there is a Cancel and an Add button.](am-create.png)
+  <a href="./images/am-create.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+
+* After creating the instance, navigate to the instance Settings page.<br><br>
+  ![Screenshot of an example on-demand Redis service instance pane in Apps Manager.
+  At the top of the pane there are tabs labeled Overview, Plan, and Settings.
+  The Settings tab is selected. There is a Service Instance Name field with the
+  buttons Update and Cancel next to it.
+  Below this, there are pairs of Configure Instance fields for adding the name
+  and value of parameters.
+  To the right of the Configure Instance fields there are plus and minus buttons
+  for adding and removing pairs of parameter fields.
+  There are Update and Cancel buttons below the Configure Instance fields.
+  At the bottom of the pane there is a Delete Service Instance button.](am_arbitrary_params.png)
+  <a href="./images/am_arbitrary_params.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+
+In either of the above cases, do the following:
+
+1. In the parameters fields enter each property you want to change and its new setting. <br>Click the **+** sign to add more parameter fields.
+1. Depending on the page you are on, click either **Add** or **Update**.
+
+If the update is unsuccessful, Apps Manager displays an error with a description of what went wrong.
+The following screenshot is an example of an error caused by a missing hyphen in the `volatile-lru` setting.
+
+![Screenshot of an on-demand Redis plan pane in Apps Manager.
+Across the top of the screenshot is a red banner containing the error message:
+'Service broker error: Invalid value "volatilelru" specified for maxmemory policy.'
+Below the error message is the header with the service description.
+Below the header on the left of the screenshot is the service plan name cache-large
+followed by a description of the plan.
+Below the header on the right of the screenshot is the Configure Instance section and its
+associated fields, with the error message printed again at the top of the section.](am-error.png)
+<a href="./images/am-error.png" target="_blank" aria-hidden="true">
+  Click here to view a larger version of this image</a>
+
+## <a id="call"></a>Retrieve the Password for a Redis Service Instance
+
+All <%= vars.product_short %> instances are password-protected and require authentication.
+This is enforced with the `requirepass` directive in the configuration file.
+
+To retrieve the password, do the following:
+
+1. Create a service-key for your Redis service instance by running:
+
+    ```
+    cf create-service-key INSTANCE-NAME SERVICE-KEY-NAME
+    ```
+
+    For example:
+
+    <pre class=terminal>
+    $ cf create-service-key my-instance my-key
+    Creating service key my-key for service instance my-instance as admin...
+    OK
+    </pre>
+
+1. Retrieve the password using the command by running:
+
+    ```
+    cf service-key INSTANCE-NAME SERVICE-KEY-NAME
+    ```
+
+    For example of this procedure, where the user is `admin`:
+
+    <pre class=terminal>
+    $ cf service-key my-instance my-key
+    Getting key my-key for service instance my-instance as admin...
+    {
+     "host": "10.0.8.4", # IP or BOSH DNS hostname for ODB instances
+     "password": "admin-password",
+     "port": 6379
+    }
+    </pre>
+
+<%= vars.product_short %> data is accessible from apps bound to that instance.
+Some <%= vars.product_short %> users bind the opensource [cf-redis-commander](https://github.com/komushi/cf-redis-commander) app to view instance data.
+This app is not maintained by the <%= vars.product_short %> team, and VMware cannot guarantee its performance or security.
+
+## <a id="call"></a>Use the Redis Service in Your App
+
+Environment variables are how Cloud Foundry communicates with a deployed app about its environment.
+To access the environment variables, bind your app to an instance and run `cf env APP_NAME` from the cf cli.
+
+To access the Redis service from your app:
+
+1. Run the following command using the name of the app bound to the <%= vars.product_short %> instance.
+
+    ```
+    cf env APP_NAME
+    ```
+
+2. In the output, note the connection strings listed in the `VCAP_SERVICES` > `credentials` object for the app.<br><br>
+Example `VCAP_SERVICES`:
+
+    <pre class="terminal">
+      {
+        "p-redis": [{
+          "credentials": {
+              "host": "10.0.0.11",
+              "password": "<redacted>",
+              "port": 6379
+          },
+          "label": "p-redis",
+          "name": "redis",
+          "plan": "shared-vm",
+          "provider": null,
+          "syslog_drain_url": null,
+          "tags": [
+          "pivotal",
+          "redis"
+          ],
+          "volume_mounts": []
+        }]
+      }
+    </pre>
+
+    <p class="note"><strong>Note</strong>: You can also search for your service
+      by its <code>name</code>, given when creating the service instance, or
+      dynamically via the <code>tags</code> or <code>label</code> properties.</p>
+
+3. In your app code, call the Redis service using the connection strings.
+
+### <a id="use-shared-vm"></a> Manage Key Eviction for Shared-VM Instances
+
+Shared-VM plans provision Redis instances with a max-memory policy set to `no-eviction`.
+
+It is up to the app developer to manage eviction of keys. The following are a few options for doing this:
+
+* After setting keys, use [EXPIRE](https://redis.io/commands/expire) to set key expiry,
+or use [SETEX](https://redis.io/commands/setex) to set key value and expiry at the same time.
+* Explicitly delete keys after the app is done using them.
+* Add a lua script to delete keys after a specified time period.
+
+
+## <a id="logging"></a> Access Redis Metrics for On-Demand Service Instances
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/services/log-cache-cli-plugin',
+:locals => {:service_name => vars.product_short} %>
+
+## <a id="sharing"></a>Sharing a Redis Instance with Another Space
+
+Sharing a service instance allows apps in different spaces to access the same Redis instance.
+Tile operators must enable this behavior and a cf admin must turn it on.
+For more information about this feature,
+see [Sharing Service Instances](https://docs.cloudfoundry.org/devguide/services/sharing-instances.html) in the Cloud Foundry documentation.
+
+To share a service instance, run:
+
+```
+cf v3-share-service REDIS-SERVICE-INSTANCE -s OTHER-SPACE [-o OTHER-ORG]
+```
+
+Where:
+
+* `REDIS-SERVICE-INSTANCE` is the name of the Redis instance.
+* `OTHER-SPACE` is the name of the other space you want to share this instance with.
+* `OTHER-ORG` is the name of another org you want to share this instance with (optional).
+
+### Unshare a Redis Service Instance
+
+<p class="note warning"><strong>WARNING</strong>: Redis only has one password and password rotation does not occur on unshare.
+After unsharing a service, any bound apps continue to have access to the Redis instance until the apps are restaged.</p>
+
+To unshare a service instance, run:
+
+```
+cf v3-unshare-service REDIS-SERVICE-INSTANCE -s OTHER-SPACE [-o OTHER-ORG]
+```
+
+Where:
+
+* `REDIS-SERVICE-INSTANCE` is the name of the Redis instance.
+* `OTHER-SPACE` is the name of the other space you want to share this instance with.
+* `OTHER-ORG` is the name of another org you want to share this instance with (optional).
+
+
+## <a id="delete"></a>Delete a Redis Instance
+
+When you delete a Redis service instance, all apps that are bound to that service are automatically unbound and any data in the service instance is cleared.
+
+### <a id="cli-delete"></a> Delete a Redis Service Instance with the cf CLI
+
+To delete a service instance:
+
+1. Run the following command and enter `y` when prompted to confirm.
+
+    ```
+    cf delete-service SERVICE-INSTANCE-NAME
+    ```
+
+    For example:
+
+    <pre class=terminal>
+    $ cf delete-service my-redis-instance
+
+    Really delete the service my-redis-instance?> y
+    Deleting service my-redis-instance in org system / space apps-manager as admin...
+    OK
+    </pre>
+
+1. If you had apps that were bound to this service, you might need to restage or
+re-push your app for the app changes to take effect. For example:
+
+    <pre class=terminal>
+    $ cf restage my-app
+    </pre>
+
+### <a id="appsman"></a> Delete a Redis Service Instance with Apps Manager
+
+To delete a service instance:
+
+1. In the service instance Settings page, click **Delete Service Instance**.
+    <br><br>
+    ![Screenshot of an example on-demand Redis service instance pane in Apps Manager.
+    At the top of the pane there are tabs labeled Overview, Plan, and Settings.
+    The Settings tab is selected. Below the tabs there is a Service Instance Name
+    field with Update and Cancel buttons next to it.
+    Below this, there is a pair of Configure Instance fields for adding the name
+    and value of parameters.
+    To the right of the Configure Instance fields there is a plus button for adding
+    more pairs of parameter fields.
+    There are Update and Cancel buttons below the Configure Instance fields.
+    At the bottom of the pane there is the Delete Service Instance button.](am_settings.png)
+    <a href="./images/am_settings.png" target="_blank" aria-hidden="true">
+      Click here to view a larger version of this image</a>
+
+1. If you had apps that were bound to this service, you might need to restage or re-push your app for the app changes to take effect. For example:
+
+    <pre class=terminal>
+    $ cf restage my-app
+    </pre>

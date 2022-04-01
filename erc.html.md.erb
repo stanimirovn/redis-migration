@@ -1,0 +1,209 @@
+---
+title: Is Redis for VMware Tanzu Application Service right for your enterprise?
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+This topic provides recommended use cases for <%= vars.product_full %>
+and information for determining the product's fit for your enterprise's use case.
+
+## <a id="usecases"></a> Recommended Use Cases
+
+On-demand plans are configured by default for cache use cases but can also be used
+as a datastore.
+
+Shared-VM plans are designed for datastore use cases in testing or development environments.
+
+<p class="note"><strong>Note</strong>: The shared-VM service should only be used for development and testing.
+   Do not use for production.</p>
+
+Redis can be used in many different ways, including:
+
+* Key/value store: For strings and more complex data structures including Hashes, Lists, Sets, and Sorted Sets
+* Session cache: Persistence enabled preservation of state
+* Full page cache: Persistence enabled preservation of state
+* Database cache: Middle-tier database caching to speed up common queries
+* Data ingestion: Because Redis is in memory, it can ingest data very quickly
+* Message queues: List and set operations. `PUSH`, `POP`, and blocking queue commands.
+* Leaderboards and counting: Increments and decrements sets and sorted sets
+  using `ZRANGE`, `ZADD`, `ZREVRANGE`, `ZRANK`, `INCRBY`, and `GETSET`
+* Pub/Sub: Built in publish and subscribe operations: `PUBLISH`, `SUBSCRIBE`, and `UNSUBSCRIBE`
+
+## <a id="benchmarks"></a> SLO Benchmark
+
+The <%= vars.product_short %> team maintains a monthly Service Level Objective (SLO) of 99.95%
+uptime for the <%= vars.product_short %> offering on Pivotal Web Services.
+This is provided as a benchmark. SLOs for separate offerings of <%= vars.product_short %>
+vary based on variables such as infrastructure, networking, and
+relevant policies around security upgrades.
+
+## <a id="offerings"></a> Service Offerings
+
+For descriptions of the service offerings for <%= vars.product_short %>, see:
+
+* [On-Demand Service Offering](./architecture.html)
+* [Shared-VM Service Offering](./architecture-pp.html)
+
+##<a id="checklist"></a> Enterprise-Readiness Checklist
+
+Review the following table to determine if <%= vars.product_short %> has the features needed to support your enterprise.
+
+<table border="1" class="nice">
+
+  <tr><th colspan=2>Resilience</th><th>More Information</th></tr>
+  <tr>
+    <td>Availability</td>
+    <td>All service offerings of <%= vars.product_short %> are single VMs without clustering capabilities.
+        This means that planned maintenance jobs (e.g., upgrades) can result in 2–10 minutes of downtime,
+        depending on the nature of the upgrade.
+        Unplanned downtime (e.g., VM failure) also affects the Redis service.<br>
+        <%= vars.product_short %> has been used successfully in enterprise-ready apps that can tolerate downtime.
+        Pre-existing data is not lost during downtime with the default persistence configuration.
+        Successful apps include those where the downtime is passively handled or
+        where the app handles failover logic.
+    </td>
+    <td><a href="#usecases">Recommended Use Cases</a><br><br>
+    <a href="#other-notes">Support for Multiple AZs</a></td>
+  </tr>
+  <tr>
+    <td>Failure Recovery</td>
+    <td>
+      Recovery from VM failures and process failures are provided for by:<br><br>
+      <ul>
+         <li> Automated service backups (both the on-demand and shared-VM Redis services)</li>
+         <li> BBR backup and recovery (only on-demand Redis services)</li>
+         <li> Manual backup and restore (both the on-demand and shared-VM Redis services)</li>
+      </ul>
+    </td>
+    <td>
+      <%-#<a> href="https://bosh.io/docs/resurrector.html" BOSH Resurrection </a> Is this the right doc here? Do we have docs for process-%>
+      <a href="./auto-backup.html">Configuring Automated Service Backups</a><br><br>
+      <a href="./bbr-backup.html">BOSH Backup and Restore (BBR) for On-Demand <%= vars.product_full %></a><br><br>
+      <a href="https://community.pivotal.io/s/article/Manually-Backing-Up-and-Restoring-Redis-for-Pivotal-Cloud-Foundry">Manually Backing Up and Restoring <%= vars.product_old %></a>
+    </td>
+  </tr>
+  <tr>
+    <td>Isolation</td>
+    <td>
+      <%-#Do we need to cover network isolation?-%>
+      Isolation is provided when using the on-demand service.
+      Individual apps and workflows should have their own <%= vars.product_short %> instance to maximize isolation.
+    </td>
+    <td>
+    </td>
+  </tr>
+  <tr><th colspan=2>Day 2 Operations</th><th>More Information</th></tr>
+  <tr>
+    <td>Resource Planning</td>
+    <td>
+    Operators can configure the number of VMs and the size of those VMs.
+    For the on-demand service, the operator does this by creating plans with specific VM sizes and quotas for each plan.
+    For the shared-VM service, the number and size of VMs are pre-provisioned by the operator.
+    BOSH errands used for registration, upgrade and cleanup use short-lived VMs that cannot be configured but can be
+    turned on or off.
+    </td>
+    <td>
+      <a href="./architecture.html#resource"> On-Demand Resource Planning</a><br><br>
+      <a href="./installing.html#shared-vm-config"> Shared-VM Plan</a>
+    </td>
+  </tr>
+  <tr>
+    <td>Health Monitoring</td>
+    <td>
+    Both the on-demand and shared service instances emit metrics.
+    These include Redis-specific metrics and <%= vars.product_short %> metrics.
+    Guidance on critical metrics and alerting levels is captured with the <%= vars.product_short %> Key Performance Indicators (KPIs).
+    </td>
+    <td>
+      <a href="./monitoring.html#kpi"> Key Performance Indicators </a><br/>
+    </td>
+  </tr>
+  <tr>
+    <td>Scalability</td>
+    <td>
+    For the on-demand service, the operator can configure three plans with different resource sizes.
+    The operator can also scale up the VM size associated with the plan.
+    Additionally, the operator can increase the quota, which caps the number of instances allowed for each on-demand plan.
+    To prevent data loss, only scaling up is supported.
+    For the shared-VM service, the operators can change the Redis instance memory limit as well as change the instance limit.
+    To prevent data loss, only scaling up is supported.
+    </td>
+    <td>
+      <a href="./installing.html#updating-on-demand-service-plans"> Scaling the On-Demand Service </a><br/>
+    </td>
+  </tr>
+  <tr>
+    <td>Logging</td>
+    <td>
+    All Redis services emit logs.
+    Operators can configure syslog forwarding to a remote destination.
+    This enables viewing logs from every VM in the <%= vars.product_short %> deployment in one place,
+    effective troubleshooting when logs are lost on the source VM,
+    and setting up alerts for important error logs to monitor the deployment.
+    </td>
+    <td>
+      <a href="./installing.html#configure-syslog-forwarding"> Configuring syslog forwarding </a>
+    </td>
+  </tr>
+  <tr>
+    <td>Customization</td>
+    <td>
+    The on-demand service can be configured to best fit the needs of a specific app.
+    The shared-VM service cannot be customized.
+    </td>
+    <td>
+      <a href="./installing.html#on-demand-config"> Configuring the On-Demand service </a>
+    </td>
+  </tr>
+  <tr>
+    <td>Upgrades</td>
+    <td>
+      <%-#More docs need to be written on what is minimum errand set you can run-%>
+      For information about preparing an upgrade and about understanding the effects on your <%= vars.product_short %>
+      and other services, see <a href="./upgrade.html">Upgrading <%= vars.product_short %></a>.
+      <%= vars.product_short %> upgrades run a post deployment BOSH errand called smoke tests to validate the success of the
+      upgrade.
+    </td>
+    <td>
+      <a href="./upgrade.html"> Upgrades </a><br><br>
+      <a href="./smoke-tests.html"> Smoke Tests </a>
+    </td>
+  </tr>
+  <tr><th colspan=2>Encryption</th><th>More Information</th></tr>
+  <tr>
+    <td>Encrypted Communication in Transit</td>
+    <td>
+      You can enable TLS encryption between apps and service instances.<br><br>
+      Additionally, <%= vars.product_short %> has been tested with the IPsec Add-on for PCF.
+    </td>
+    <td>
+      <a href="https://redis.io/topics/security">OS Redis Security</a><br><br>
+      <a href="./architecture.html#tls">TLS in <%= vars.product_short %></a><br><br>
+      <a href="https://docs.pivotal.io/addon-ipsec/index.html">Securing Data in Transit with the IPsec add-on</a>
+    </td>
+  </tr>
+</table>
+
+### <a id="other-notes"></a>Availability Zones
+
+On-demand <%= vars.product_short %> supports configuring multiple availability
+zones (AZs) to improve resiliency.
+However, assigning multiple AZs to Redis service instances does not provide high availability.
+This is because each individual Redis service instance is a single VM without
+clustering capabilities.
+
+The diagram below shows a Redis deployment configured with three availability zones.
+
+![A Redis deployment across three availability zones. Availability zone one contains
+the on-demand service broker, the shared service broker, shared instances, and on-demand service instances.
+Availability zones two and three contain on-demand service instances.](availability-zones.png)
+<a href="./images/availability-zones.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+
+Service instance VMs are placed in availability zones as follows:
+
++ **For on-demand plans**: Service instances can be configured to deploy to any AZ.
+  If you select multiple AZs, service instances are distributed randomly between them.
+  This improves resiliency.
++ **For the shared-VM plan**: Service instances run on a single VM in the AZ in which the tile is deployed.

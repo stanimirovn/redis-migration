@@ -1,0 +1,97 @@
+---
+title: Redis for VMware Tanzu Application Service
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+This is documentation for <%= vars.product_full %>.
+You can download the <%= vars.product_short %> tile from [<%= vars.product_network %>](https://network.pivotal.io/products/p-redis).
+
+This documentation:
+
++ Describes features and architecture of <%= vars.product_short %>.
++ Instructs operators on how to install, configure, maintain, and backup <%= vars.product_short %>.
++ Instructs app developers on how to choose a service plan, create and delete
+  Redis service instances, and bind an app.
+
+##<a id="snapshot"></a> Product Snapshot
+
+<table class="nice">
+    <th>Element</th>
+    <th>Details</th>
+    <tr>
+        <td>Version</td>
+        <td>3.1.0</td>
+    </tr>
+    <tr>
+        <td>Release date</td>
+        <td>March 1, 2022</td>
+    </tr>
+    <tr>
+        <td>Software component version</td>
+        <td>Redis OSS 6.2.6</td>
+    </tr>
+    <tr>
+        <td>Compatible <%= vars.ops_manager %> version(s)</td>
+        <td>2.9 and 2.10</td>
+    </tr>
+    <tr>
+        <td>Compatible <%= vars.app_runtime_full %> version(s)</td>
+        <td>2.11 and 2.12</td>
+    </tr>
+    <tr>
+        <td>IaaS support</td>
+        <td>AWS, Azure, GCP, OpenStack, and vSphere</td>
+    </tr>
+   <tr>
+        <td>IPsec support</td>
+        <td>Yes</td>
+    </tr>
+</table>
+
+##<a id="about-redis"></a> About Redis
+
+<strong><em>Redis</em></strong> is an easy-to-use, high-speed key-value store that can be used as a database, cache, and message broker.
+It supports a range of data structures including strings, lists, hashes, sets, bitmaps, HyperLogLogs, and geospatial indexes.
+It is easy to install and configure and is popular with engineers as a straightforward NoSQL datastore.
+It is used for everything from a quick way to store data for development and testing through to enterprise-scale apps like Twitter.
+
+## <a id="about"></a> About <%= vars.product_short %>
+
+<%= partial vars.path_to_partials + '/redis/service-offerings', :locals => {
+  :redis_name => "<strong><em>" + vars.product_short + "</em></strong>"} %>
+
+### <a id="erc"></a> Is <%= vars.product_short %> right for your enterprise?
+
+For information about recommended use cases, and the enterprise-readiness of <%= vars.product_short %>, see [Is <%= vars.product_short %> right for your enterprise?](./erc.html).
+
+### <a id="upgrading"></a> Upgrading to the Latest Version
+
+For information about how to upgrade and the supported upgrade paths, see [Upgrading <%= vars.product_full %>](./upgrade.html).
+
+##<a id="more-info"></a> More Information
+
+The following table lists where you can find topics related to the information about this page:
+
+| For more information about&hellip; | See&hellip; |
+|----------------------------|-------------|
+|Product compatibility       |<a href="https://upgrade-planner.pivotal.io/">Upgrade Planner</a>|
+|How to upgrade <%= vars.product_short %>|<a href="upgrade.html">Upgrading <%= vars.product_full %></a>|
+|How to use Redis |<a href="http://redis.io/documentation">Redis Documentation</a>|
+
+##<a id="other-services"></a> <%= vars.product_short %> and Other Services
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+<%= partial vars.path_to_partials + '/services/on-demand-service-table', :locals => {
+  :service_name => vars.product_short,
+  :rabbit => "VMware Tanzu RabbitMQ for VMs",
+  :redis => vars.product_short,
+  :mysql => "VMware Tanzu SQL with MySQL for VMs",
+  :cloud_cache => "VMware Tanzu GemFire for VMs",
+  :gemfire => "VMware GemFire"
+} %>
+
+##<a id="feedback"></a> Feedback
+
+Please provide any issues, feature requests, or questions to [the Feedback list](mailto:"pivotal-cf-feedback@pivotal.io").

@@ -1,0 +1,352 @@
+---
+title: Troubleshooting Instances
+owner: Redis
+---
+
+<strong><%= modified_date %></strong>
+
+This topic provides basic instructions for app developers troubleshooting on-demand <%= vars.product_full %>.
+
+## <a id="errors"></a> Troubleshooting Errors
+
+Start here if you are responding to a specific error or error messages.
+
+### <a id="x-product"></a> Common Service Errors
+
+The following errors occur in multiple services:
+
+- [Apps Fail to Connect to the Service Instance](#connect-fails)
+- [No Metrics from Log Cache](#no-metrics)
+
+<a name="connect-fails"></a>
+<table class="nice">
+  <style>
+    main table {
+      table-layout: fixed;
+    }
+  </style>
+  <col width="20%">
+  <col width="80%">
+  <tr>
+  <th colspan="2" style="text-align: left;">
+    <br>
+    Apps Fail to Connect to the Service Instance
+    <br><br>
+  </th>
+  </tr>
+  <tr>
+    <th>Symptom</th>
+    <td>Apps fail to connect to the Redis service instance.</td>
+  </tr>
+  <tr>
+    <th>Cause</th>
+    <td>
+      <p>
+        The Redis on-demand service broker now binds apps to service instances using BOSH DNS.
+        Service bindings return the DNS address instead of the IP address.
+        If an operator enables the BOSH HotSwaps feature, any apps with service bindings that
+        do not use BOSH DNS will fail to connect to the Redis service instance.
+      </p>
+      <p>For more information, see <a href="./upgrade.html#bosh-hotswaps">Enable BOSH HotSwaps to Reduce Downtime</a>.</p>
+      <p>
+        For more information about service bindings, see
+        <a href="https://docs.cloudfoundry.org/devguide/services/application-binding.html">Service Bindings</a> in the Cloud Foundry documentation.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <th style="vertical-align: top; padding-top: 1em;">Solution</th>
+    <td>
+      <p>
+        Convert service instance bindings to use BOSH DNS.
+        To do so, unbind, rebind, and restage all apps that were bound to a service
+        instance using an IP address as follows:
+      </p>
+      <ul>
+        <li>Unbind the app:
+          <pre class="terminal">cf unbind-service APP-NAME SERVICE-INSTANCE-NAME</pre>
+        </li>
+        <li>Rebind the app:
+          <pre class="terminal">cf bind-service APP-NAME SERVICE-INSTANCE-NAME</pre>
+        </li>
+        <li>Restage the app:
+          <pre class="terminal">cf restage APP-NAME</pre>
+        </li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/services-tshoot/tshoot-no-metrics' %>
+
+### <a id="specific-errors"></a> <%= vars.product_short %> Specific Errors
+
+The following errors are specific to <%= vars.product_short %>:
+
+- [Maximum Number of Clients Reached](#max-clients)
+- [Maxmemory Limit Reached](#maxmemory)
+- [Error When Running the Save Command](#err-save-command)
+- [Unknown Command Error](#err-unknown-command)
+
+<p class="note"><strong>Note:</strong>
+  Certain errors are returned to the Redis
+  client instead of being recorded in the logs. The Redis protocol represents
+  errors as simple strings beginning with a <code>-</code> character.
+</p>
+
+<a name="max-clients"></a>
+<table class="nice">
+  <style>
+    main table {
+      table-layout: fixed;
+    }
+  </style>
+  <col width="20%">
+  <col width="80%">
+  <tr>
+  <th colspan="2" style="text-align: left;">
+    <br>
+    Maximum Number of Clients Reached
+    <br><br>
+  </th>
+  </tr>
+  <tr>
+    <th>Symptom</th>
+    <td>
+      <p>You receive the following error:</p>
+      <pre class="terminal">-ERR max number of clients reached</pre>
+    </td>
+  </tr>
+  <tr>
+    <th>Cause</th>
+    <td>This is usually caused by apps opening multiple client connections to Redis.</td>
+  </tr>
+  <tr>
+    <th style="vertical-align: top; padding-top: 1em;">Solution</th>
+    <td>
+      Share or pool Redis connections within an app. <%= vars.product_short %> configures
+      Redis to accept 10000 client connections.
+      This can be confirmed by running the <code>INFO</code> command using the Redis CLI.
+    </td>
+  </tr>
+</table>
+
+<a name="maxmemory"></a>
+<table class="nice">
+  <style>
+    main table {
+      table-layout: fixed;
+    }
+  </style>
+  <col width="20%">
+  <col width="80%">
+  <tr>
+  <th colspan="2" style="text-align: left;">
+    <br>
+    Maxmemory Limit Reached
+    <br><br>
+  </th>
+  </tr>
+  <tr>
+    <th>Symptom</th>
+    <td>
+      <p>You receive the following error:</p>
+      <pre class='terminal'>-OOM command not allowed when used memory > 'maxmemory'.</pre>
+    </td>
+  </tr>
+  <tr>
+    <th>Cause</th>
+    <td>This occurs when the Redis server has reached its <code>maxmemory</code> limit.</td>
+  </tr>
+  <tr>
+    <th style="vertical-align: top; padding-top: 1em;">Solution</th>
+    <td>
+      <p>
+        Consider changing your maxmemory-policy.
+        You can update this using the <code>cf update-service</code> parameters.
+        For how to do this, see <a href="using.html#custom">Customize an On-Demand Service Instance</a>.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<a name="err-save-command"></a>
+<table class="nice">
+  <style>
+    main table {
+      table-layout: fixed;
+    }
+  </style>
+  <col width="20%">
+  <col width="80%">
+  <tr>
+  <th colspan="2" style="text-align: left;">
+    <br>
+    Error When Running the Save Command
+    <br><br>
+  </th>
+  </tr>
+  <tr>
+    <th>Symptom</th>
+    <td>
+      <p>
+        You receive the following error message when running <code>redis-cli SAVE</code>
+        or issuing the save command using another Redis client:
+      </p>
+      <pre class="terminal">-ERR</pre>
+    </td>
+  </tr>
+  <tr>
+    <th>Cause</th>
+    <td>This might occur when the Redis server's disk is full.</td>
+  </tr>
+  <tr>
+    <th style="vertical-align: top; padding-top: 1em;">Solution</th>
+    <td>
+      A more informative message might be logged in the syslog.
+      For more information, see <a href="./troubleshooting.html#syslog-errors">Syslog Errors</a>.
+    </td>
+  </tr>
+</table>
+
+<a name="err-unknown-command"></a>
+<table class="nice">
+  <style>
+    main table {
+      table-layout: fixed;
+    }
+  </style>
+  <col width="20%">
+  <col width="80%">
+  <tr>
+  <th colspan="2" style="text-align: left;">
+    <br>
+    Unknown Command Error
+    <br><br>
+  </th>
+  </tr>
+  <tr>
+    <th>Symptom</th>
+    <td>
+      <p>
+        You receive the following error message when running <code>redis-cli COMMAND</code> or issuing
+        a command using another Redis client:
+      </p>
+      <pre class="terminal">-ERR unknown command</pre>
+    </td>
+  </tr>
+  <tr>
+    <th>Cause</th>
+    <td>
+      For security reasons, certain commands such as <code>CONFIG</code>,
+      <code>SAVE</code>, <code>BGSAVE</code> and <code>ACL</code>
+      are not available by default.
+    </td>
+  </tr>
+  <tr>
+    <th style="vertical-align: top; padding-top: 1em;">Solution</th>
+    <td>Talk to your operator about the availability of the command.</td>
+  </tr>
+</table>
+
+
+## <a id="techniques"></a> Techniques for Troubleshooting
+
+See the following sections for troubleshooting techniques when using
+the Cloud Foundry Command-Line Interface (cf CLI) to perform basic
+operations on a <%= vars.product_short %> service instance.
+
+Basic cf CLI operations include `create`, `update`, `bind`, `unbind`, and `delete`.
+
+
+### <a id="debugging"></a>Debug Using the CF CLI
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/redis/debugging-using-cf-cli' %>
+
+### <a id="parse-error"></a>Parse a Cloud Foundry (CF) Error Message
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/services-tshoot/tshoot-tech-parse-error' %>
+
+### <a id="instance"></a> Retrieve Service Instance Information
+
+To retrieve information about the service instance that you can use for debugging:
+
+1. Log into the space containing the instance or failed instance.
+    <pre class="terminal">
+    $ cf login
+    </pre>
+
+1. If you do not know the name of the service instance, you can view a listing
+of all service instances in the space by running:
+
+    ```
+    cf services
+    ```
+
+    The service instances are listed in the `name` column.<br><br>
+
+    For example:
+    <pre class="terminal">
+    $ cf services
+    Getting services in org my-org / space my-space as user<span>@</span>example.com...
+    OK
+    name          service      plan               bound apps    last operation
+    my-instance   p.redis      on-demand-cache                  create succeeded
+    </pre>
+
+1. Retrieve more information about a specific service instance by running:
+
+    ```
+    cf service SERVICE-INSTANCE-NAME
+    ```
+
+1. Retrieve the GUID of the service instance by running:
+
+    ```
+    cf service SERVICE-INSTANCE-NAME --guid
+    ```
+
+    This is useful for debugging.
+
+1. If the Log Cache CLI plugin is enabled, you can retrieve logs for the service instance by running:
+
+    ```
+    cf tail SERVICE-INSTANCE-NAME/APP-NAME
+    ```
+
+    For more information, see <a href="using.html#logging">Log Cache CLI plugin</a>.
+
+### <a id="instance-credentials"></a> Retrieve the Password for a Redis Service Instance
+
+If you want to access the Redis server for troubleshooting,
+you can find a Redis service instance password by creating a new service key.
+
+<p class="note"><strong>Note:</strong>
+  VMware recommends that you use this key for troubleshooting only, and that you
+  delete the key after troubleshooting by running the command <code>cf delete-service-key SERVICE-INSTANCE KEY-NAME</code>.
+</p>
+
+For instructions on how to retrieve the password, see [Retrieve the Password for a Redis Service Instance](./using.html#call).
+
+## <a id="outages"></a>Temporary Outages
+
+<%= vars.product_short %> service instances can become temporarily inaccessible during upgrades and VM or network failures.
+
+
+## <a id="kb"></a>Knowledge Base (Community)
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/services-tshoot/tshoot-kb' %>
+
+## <a id="support"></a>File a Support Ticket
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/services-tshoot/tshoot-support-dev' %>

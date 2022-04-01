@@ -1,0 +1,218 @@
+---
+title: Shared-VM Service Offering
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+<%= vars.product_full %> offers on-demand and shared-VM service plans.
+This section describes the architecture, lifecycle, and configurations of the shared-VM plan.
+For similar information for the on-demand service plan, see [On-Demand Service Offering](./architecture.html).
+
+## <a id="about"></a> About the Shared-VM Plan
+
+The shared-VM plan is a pre-provisioned service plan for development and testing purposes only.
+An instance of this plan provisions a single Redis process on a single shared VM.
+This plan is suitable for workloads that do not require dedicated hardware.
+This plan is **not** suitable for production purposes.
+
+
+## <a id="diagram2"></a>Architecture Diagram for Shared Plans
+
+The p-redis service broker manages the shared-vm plan service instances.
+
+The diagram below shows the architecture of the service broker and shared-VM plans
+and how the user's app binds to a Redis instance.
+
+![The service broker is shown with six shared-VM plan instances.
+A user's app points to one of the shared VM plan instances.
+See below for a detailed image description.](legacy-arch.png)
+
+The diagram above shows the p-redis service broker pointing to a shared-VM plan instance,
+which was created by running `cf create-service`.
+For more information about this command, see [Create a Service Instance](using.html#create) in _Using <%= vars.product_full %>_.
+
+The service broker VM contains the shared-VM plan instances.
+Six shared-VM plan instances are shown.
+These are provisioned when created by the app developer.
+The maximum number is specified by the operator.
+
+Each shared instance has its own Redis server, with credentials stored in the
+`VCAP_SERVICES` environment variable.
+
+The user's app is bound to a shared-VM plan instance, shown above by an arrow labeled
+_binding_ pointing from the app to a shared-VM plan instance.
+For information about binding, see [Bind a Service Instance to Your App](using.html#bind) in _Using <%= vars.product_full %>_.
+
+## <a id="config2"></a> Settings for Shared-VM Service Plans
+
+You cannot change the default Redis settings for shared-VM plans. Because of this, you cannot run
+ `cf update-service` with the `-c` flag to set config parameters, as described in the [Cloud Foundry documentation](https://cli.cloudfoundry.org/en-US/cf/update-service.html).
+
+The default Redis settings are as follows:
+
+### <a id="memory-policy"></a> Memory Policy
+
+Redis is configured with a `maxmemory-policy` of `no-eviction`. This policy means that when the memory is
+ full, the service does not evict any keys or perform any write operations until memory becomes available.
+
+### <a id="persistence"></a> Persistence
+
+Shared-VM Redis supports both Redis Database Backup (RDB) and Append-Only File (AOF) persistence options.
+Redis writes to the AOF log every second. For more information, see
+[Redis Persistence](https://redis.io/topics/persistence) in the Redis documentation.
+
+### <a id="connections"></a> Maximum Number of Connections
+
+The maximum number of connections, `maxclients`, is set at 10,000 by default.
+Redis might reduce this number when run on a system with a low maximum number of file descriptors.
+You can retrieve the actual setting on your Redis service instances with the Redis command `CONFIG GET maxclients`.<br><br>
+You can run the Redis command `CONFIG SET maxclients NUMBER` in your service instance to reduce `maxclients`
+until the next BOSH action occurs. For example:
+<pre class="terminal">
+$ CONFIG SET maxclients 9000
+</pre>
+You cannot set `maxclients` above 10,000 and you cannot configure shared plans to permanently use a custom limit.
+
+
+### <a id="rep-and-event-note"></a> Replication and Event Notification
+
+Replication and event notification are not configured.
+
+## <a id="instance-deploy"></a>Change the Service Instances Limit
+
+This plan deploys a Redis instance on a shared VM and a single service broker VM. To prevent this, set the **Max instances limit** on the **Shared-VM Plan** tab in <%= vars.ops_manager %> to `0`.
+
+You can increase the maximum number of service instances that can run on a shared VM from the default five to
+ 250. There is a hard maximum of 250 shared instances.
+
+If you increase the number of instances that can be run on a VM, consider increasing the resources allocated
+ to the VM, especially RAM and CPU. Failure to do so might lead to a degradation of performance.
+
+You can also increase the maximum amount of RAM allocated to each service instance that is running on this VM.
+
+If you decrease the service instance limit, any instances that are now running
+  beyond the limit are not automatically terminated. You cannot create any new instances until the total
+  falls below the new limit.<br>
+  For example, if you use 10 service instances, and you then reduce the limit to 8, the two instances outside
+  the limit continue to run until you terminate them.
+
+The number of shared-VM instances available to developers is set by the operator.<br>
+The maximum number of shared-VM instances is relative to the memory allocated to each shared-VM instance and
+the total memory of the Redis service broker.<br>
+For more information, see [Configure Shared-VM Plan Settings](./installing.html#shared-vm-config).
+
+## <a id="lua-scripting"></a> Lua Scripting
+
+You can enable or disable Lua scripting. Changes to this configuration apply to all existing shared-VM
+instances. Lua scripting can adversely affect the performance of other service instances on the VM, so
+VMware recommends disabling Lua scripting unless developers need it enabled.
+For more information, see [Configure Shared-VM Plan Settings](./installing.html#shared-vm-config).
+
+<p class="note warning"><strong>Warning:</strong>
+  The Steeltoe connector for Redis requires <%= vars.product_short %> to support Lua scripting.
+  Check if any of your apps require Lua scripting.
+  By default, Lua scripting is disabled for <%= vars.product_short %>, but an operator can
+  change the setting to enable it by selecting the <strong>Lua Scripting</strong> checkbox in the
+  Shared-VM Plan configuration pane.
+</p>
+
+## <a id="limits-shared"></a> Known Limitations of the Shared-VM Plan
+
+The shared-vm plan cannot:
+
+* Scale beyond a single VM
+* Run the commands `CONFIG`, `MONITOR`, `SAVE`, `BGSAVE`, `SHUTDOWN`, `BGREWRITEAOF`, `REPLICAOF`, `SLAVEOF`, `DEBUG`, or `SYNC`
+* Constrain CPU or disk usage
+* Manage "noisy neighbor" problems, which makes it unsuitable for production apps
+
+
+## <a id="lifecycle-shared"></a>Lifecycle for Shared-VM Service Plan
+
+Below is the lifecycle of <%= vars.product_short %>, from an operator installing the tile, to an app developer using the service, to an operator deleting the tile.
+
+![Three columns are shown, labeled 'Operator', 'Redis', and 'App Developer'.
+The workflows in this image are described in detail below.](Redis_timeline_legacy.png)
+
+### <a id ="install"></a> Installation
+
+Operators do the following to install <%= vars.product_short %>:
+
+1. Configure:
+  - VM size
+  - Number of shared instances
+  - Syslog forwarding
+  - Backup destination
+  - Metrics interval
+  - Click **Save**
+
+1. Install Redis
+  - Click **Apply changes**
+
+After the operator clicks **Apply Changes**, <%= vars.product_short %> does the following:
+
+1. Create service broker VM
+1. Broker registers as available in marketplace
+1. Run smoke tests
+1. Service broker ready
+
+### <a id ="use"></a> Using <%= vars.product_short %>
+
+After operators have installed <%= vars.product_short %>, developers can
+create service instances, bind and unbind the service instances to apps, and
+delete service instances.
+These operations are described below.
+
+#### <a id ="create-service"></a> Create Service
+
+When a developer runs the `cf create-service` command, for example:
+
+<pre class="terminal">$ cf create-service p-redis shared-vm mysharedinstance</pre>
+
+<%= vars.product_short %> does the following:
+
+- If the maximum number of instances has not been reached, memory is allocated
+and a shared-VM Redis instance is created
+
+#### <a id ="bind-service"></a> Bind Service
+
+When a developer runs the `cf bind-service` command, for example:
+
+<pre class="terminal">$ cf bind-service my-application mysharedinstance</pre>
+
+<%= vars.product_short %> does the following:
+
+- Redis credentials are stored in the app's `VCAP_SERVICES` environment variable
+and the app can talk directly to the Redis server inside the service instance
+
+#### <a id ="unbind-service"></a> Unbind Service
+
+When a developer runs the `cf unbind-service` command, for example:
+
+<pre class="terminal">$ cf unbind-service my-application mysharedinstance</pre>
+
+<%= vars.product_short %> does the following:
+
+- Redis credentials are removed from the app's `VCAP_SERVICES` environment variable
+
+#### <a id ="delete-service"></a> Delete Service
+
+When a developer runs the `cf delete-service` command, for example:
+
+<pre class="terminal">$ cf delete-service mysharedinstance</pre>
+
+<%= vars.product_short %> does the following:
+
+- The service instance is deprovisioned and the memory in the service broker is freed
+
+### <a id ="delete"></a> Deletion
+
+Operators do the following to delete <%= vars.product_short %>:
+
+1. Delete Redis
+  - Click **Apply Changes**
+
+After the operator clicks **Apply Changes**, <%= vars.product_short %> does the following:
+
+1. Service broker and all provisioned instances are deleted
+1. Broker deregistrar errand runs `cf purge-service`

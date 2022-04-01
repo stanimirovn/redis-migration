@@ -1,0 +1,224 @@
+---
+title: Introduction for Operators
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+This topic is for <%= vars.app_runtime_full %> operators.
+It introduces some best practices, but does not provide details about operation.
+
+
+## <a id="Best Practice"></a>Best Practices
+
+VMware recommends that operators follow these guidelines:
+
+* **Resource Allocation**---Work with app developers to anticipate memory requirements and to configure VM sizes.
+    Instances of the Shared-VM service have identical VM sizes.
+    However, with the On-Demand service, app developers can choose from three
+    different plans, each with its own VM size and quota.
+    See the service offering for the [On-Demand Service Offering](./architecture.html) and
+    [Resource Usage Planning for On-Demand plans](./architecture.html#resource).
+* **Logs**---Configure a syslog output.
+    Storing logs in an external service helps operators debug issues both current and historical.
+    See [Configure Syslog Output](./installing.html#syslog). In particular, set
+    up alerts on critical logs, such as service backups so that you are alerted
+    if a backup fails. For examples of critical logs for service backups, see
+    <a href="https://docs.pivotal.io/svc-sdk/service-backup/18-1/#troubleshooting">Troubleshooting</a> in the Service Backup documentation.
+* **Monitoring**---Set up a monitoring dashboard for metrics to track the health of the installation.
+* **Backing Up Data**---When using Redis for persistence, configure automatic backups so that data can be restored in an emergency.
+    Validate the backed-up data with a test restore.
+    See [Configuring Automated Backups](./auto-backup.html) and also [Manually Backing Up and Restoring <%= vars.product_old %>](https://community.pivotal.io/s/article/Manually-Backing-Up-and-Restoring-Redis-for-Pivotal-Cloud-Foundry) in the VMware Tanzu Support knowledge base.
+* **Using**---Instances of the On-Demand service run on dedicated VMs.
+    Apps in production should have an on-demand instance to prevent performance
+    issues caused by sharing an instance.
+    The Shared-VM service shares a VM across many instances.
+    VMware recommends that you only use the Shared-VM service for development
+    and testing, but not in production environments.
+    For more information about the plans, see the [On-Demand Service Offering](./architecture.html)
+    and the [Shared-VM Service Offering](./architecture-pp.html).
+
+## <a id="keycount"></a> Redis Key Count and Memory Size
+
+Redis can handle up to 2<sup>32</sup> keys, and was tested in practice to handle at least 250 million keys per instance.
+Every hash, list, set, and sorted set, can hold 2<sup>32</sup> elements.
+VM memory is more likely to be a limiting factor than number of keys that can be handled.
+
+## <a id="errands"></a>Errands
+
+<%= vars.product_full %> includes the errands listed below.
+
+### <a id="post-deploy"></a> Post-Deploy Errands
+
+The following post-deploy errands are run by default when **Apply Changes** is triggered.
+These errands run whether or not there has been a configuration change in the <%= vars.product_short %> tile.
+
+<table class="nice">
+  <tr>
+    <th width="18%"><%= vars.ops_manager %> UI Name</th>
+    <th width="27%">BOSH Errand Name</th>
+    <th width="55%">Description</th>
+  </tr>
+  <tr>
+    <td><strong>Broker Registrar</strong></td>
+    <td><code>broker-registrar</code></td>
+    <td>Registers the cf-redis-broker with <%= vars.app_runtime_abbr %> to offer the <code>p-redis</code> service,
+      that is, the shared-VM plan.</td>
+  </tr>
+  <tr>
+    <td><strong>Smoke Tests</strong></td>
+    <td><code>smoke-tests</code></td>
+    <td>Runs lifecycle tests for shared-VM plans if these have been enabled and there is remaining quota available.<br><br>
+        The tests cover provisioning, binding, reading, writing, unbinding, and deprovisioning of service instances.</td>
+  </tr>
+  <tr>
+    <td><strong>Register On-Demand Broker</strong></td>
+    <td><code>register-broker</code></td>
+    <td>Registers the on-demand Redis broker with <%= vars.app_runtime_abbr %> to offer the <code>p.redis</code> service (on-demand plans).</td>
+  </tr>
+  <tr>
+    <td><strong>On-Demand Smoke Tests</strong></td>
+    <td><code>on-demand-broker-smoke-tests</code></td>
+    <td>Runs lifecycle tests for enabled plans of the <code>p.redis</code> service if there is remaining quota available.<br><br>
+        The tests cover provisioning, binding, reading, writing, unbinding and deprovisioning of service instances.</td>
+  </tr>
+  <tr>
+    <td><strong>Upgrade All On-Demand Service Instances</strong></td>
+    <td><code>upgrade-all-service-instances</code></td>
+    <td>Upgrades on-demand service instances to use the latest plan configuration, service releases, and stemcell. This causes downtime to any service instances with available upgrades.</td>
+  </tr>
+</table>
+
+<br>
+The following post-deploy errands do not run by default when **Apply Changes** is triggered.
+These errands help operators to troubleshoot and maintain their service fleet.
+
+
+<table class="nice">
+  <tr>
+    <th width="18%"><%= vars.ops_manager %> UI Name</th>
+    <th width="27%">BOSH Errand Name</th>
+    <th width="55%">Description</th>
+  </tr>
+  <tr>
+    <td><strong>Recreate All On-Demand Service Instances</strong></td>
+    <td><code>recreate-all-service-instances</code></td>
+    <td>Re-creates on-demand service instances one-by-one. This causes downtime for all service instances.</td>
+  </tr>
+  <tr>
+    <td><strong>Find Orphan On-Demand Service Instances</strong></td>
+    <td><code>orphan-deployments</code></td>
+    <td>Finds all orphan on-demand service instances.
+      The cleanup of orphan on-demands service instances can be carried out manually.</td>
+  </tr>
+</table>
+
+
+### <a id="pre-delete"></a> Pre-Delete Errands
+
+The following pre-delete errands are run by default when the <%= vars.product_short %> tile is deleted:
+
+<table class="nice">
+  <tr>
+    <th width="18%"><%= vars.ops_manager %> UI Name</th>
+    <th width="27%">BOSH Errand Name</th>
+    <th width="55%">Description</th>
+  </tr>
+  <tr>
+    <td><strong>Broker Deregistrar</strong></td>
+    <td><code>broker-deregistrar</code></td>
+    <td>Deregisters the <code>cf-redis-broker</code>.</td>
+  </tr>
+  <tr>
+    <td><strong>Delete All <br>On-Demand Service Instances and Deregister Broker</strong></td>
+    <td><code>delete-all-service-instances-and-deregister-broker</code></td>
+    <td>Deletes all on-demand instances and deregisters the on-demand Redis broker.</td>
+  </tr>
+</table>
+
+
+### <a id="turning-off"></a> Turning off Post-Deploy Errands
+
+VMware recommends that you run the post-deploy errands at any trigger of **Apply Changes**.
+However, this practice can extend the duration of applying changes by several minutes every time.
+This section helps you decide when it is safe to skip some post-deploy errands.
+
+#### Changes to <%= vars.product_short %> Tile Configuration
+
+If the changes include configuration changes on the <%= vars.product_short %> tile or a new stemcell version, the operator must run all post-deploy errands.
+
+#### Installing Another Tile
+
+When installing another tile that does not make any changes to the BOSH Director
+or the <%= vars.app_runtime_full %> (<%= vars.app_runtime_abbr %>),
+it is not necessary to run any of the <%= vars.product_short %> tile's post-deploy errands.
+
+#### Changes to Other Tiles
+
+Sometimes the change does not include changes to the <%= vars.product_short %> tile's configuration.
+Then it might not be necessary to run all of the <%= vars.product_short %> tile's post-deploy errands.
+
+#### Broker Registrar Errand
+
+- Required to run if the CF system domain is changed in the <%= vars.app_runtime_abbr %>tile.
+- Not necessary to run if the change only involves other tiles except <%= vars.app_runtime_abbr %>tile.
+
+#### Register On-Demand Broker Errand
+
+- Required to run if the network range that the Redis on-demand broker is deployed in is changed in the BOSH Director tile.
+- Not necessary to run if the change only involves other tiles except BOSH Director.
+
+<p class="note">
+VMware <a href="./upgrade.html#network-upgrades">recommends</a> against changing the BOSH Director's network configuration
+in a way that changes the ranges where the <%= vars.product_short %> tile deploys VMs.
+</p>
+
+#### Smoke Tests and On-Demand Smoke Tests Errands
+
+- Required to run if their respective register broker errand is required.
+- Required to run both if a newer stemcell minor version is uploaded.
+  The <%= vars.product_short %> tile floats to the newest minor version.
+  For more information, see [Floating Stemcells](https://docs.pivotal.io/pivotalcf/customizing/understanding-stemcells.html).
+- Good practice to run both for any change in the BOSH Director or <%= vars.app_runtime_abbr %>tile.
+- Not necessary to run either if the change only involves other tiles except <%= vars.app_runtime_abbr %>and BOSH Director.
+
+#### Upgrade All On-Demand Service Instances Errand
+
+- Required to run if a newer stemcell minor version is uploaded.
+  The <%= vars.product_short %> tile floats to the newest minor version.
+  For more information, see [Floating Stemcells](https://docs.pivotal.io/pivotalcf/customizing/understanding-stemcells.html).
+- Not necessary to run if there are no on-demand instances provisioned.
+
+#### Recreate All On-Demand Service Instances
+
+- Necessary when an instance must be re-created with different resources,
+  such as when rotating CA certificates.
+- Might increase the time that `Apply Changes` takes because it follows the typical
+  instance lifecycle.
+- Not necessary to run if there are no on-demand instances provisioned.
+  Recommended to be turned off unless needed.
+
+#### Find Orphan On-Demand Service Instances
+
+- Queries BOSH for any orphaned Redis on-demand instances
+and then displays them during `Apply Changes`.
+- Does not remove any instances. Informs the operator of
+the details of orphaned instances so the operator can decide when and how to remove them.
+
+##  <a id="smoke"></a>Smoke Tests
+
+<%= vars.ops_manager %> runs <%= vars.product_short %> smoke tests as a post-install errand.
+To run the smoke tests errand manually:
+
+1. Retrieve the deployment name of the installed product. To find the deployment name:
+  1. From the <%= vars.ops_manager %> UI, click the <%= vars.product_short %> tile.
+  1. Copy the part of the URL that starts with "p-redis-".
+
+1. Run the smoke tests errand: <br>
+`bosh -d REDIS-DEPLOYMENT-NAME run-errand smoke-tests`
+
+For more information, see [<%= vars.product_full %> Smoke Tests](./smoke-tests.html).
+
+<p class="note"><strong>Note</strong>: Smoke tests fail unless you enable global default app security groups (ASGs).
+   You can enable global default ASGs by binding the ASG to the <code>system</code> org without specifying a space.
+   To enable global default ASGs, use <code>cf bind-running-security-group</code>.</p>

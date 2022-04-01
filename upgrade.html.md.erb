@@ -1,0 +1,228 @@
+---
+title: Upgrading Redis for VMware Tanzu Application Service
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+This section contains the upgrade procedure and upgrade paths for <%= vars.product_full %>.
+
+##<a id="upgrading"></a> Compatible Upgrade Paths
+
+<%= partial vars.path_to_partials + '/upgrade-planner' %>
+
+## <a id="upgrades"></a> Upgrade <%= vars.product_short %>
+
+<%= partial vars.path_to_partials + '/redis/warning-disabling-tls' %>
+
+This product enables a reliable upgrade experience between versions of the product
+deployed through <%= vars.ops_manager %>.
+
+For information about the upgrade paths for each released version, see
+[Compatible Upgrade Paths](#upgrading) above.
+
+### <a id="procedure"></a> Upgrade Procedure
+
+To upgrade to the latest version of <%= vars.product_short %>:
+
+1. Download the latest version of the product from [<%= vars.product_network %>](https://network.pivotal.io/products/p-redis).
+
+1. Upload the new `.pivotal` file to <%= vars.ops_manager %>.
+
+1. If required, upload the stemcell associated with the update.
+
+1. If required, update any new mandatory configuration parameters.
+
+1. (Optional) To enable TLS:
+  1.  Follow the procedures in [Preparing for TLS](./preparing-tls.html).
+    <p class="note"> <strong>Note:</strong>
+      In most cases, enabling TLS does not noticeably reduce performance. Performance impact depends on the health of resources, such as network infrastructure and application architecture.
+    </p>
+  1. In the <%= vars.product_short %> tile, select **On-Demand Service Settings**.
+  1. Under **Enable TLS**, select **Optional**.
+  1. Enable the checkbox next to each TLS version you want to support.
+  VMware recommends supporting TLS v1.1 and later. VMware does not recommend supporting TLS v1.0
+  because it is less secure than later versions, but it is an option for apps that only support this
+  protocol.
+    <p class="note">
+      <strong>Note:</strong> After selecting a TLS version, VMware recommends generating a new service
+      key and then rebinding the service instance with the new service key.
+      This makes the service key's <code>tls_versions</code> field reflect the new TLS version, which
+      can help developers who use the service key to see the supported TLS version.
+      To create a new service key, follow the steps in <a href="./appdevs.html#check-availability-tls">Check Availability</a>.
+      To rebind the instance, follow the steps in <a href="./appdevs.html#existing-apps">Bind Existing Apps with TLS</a>.
+    </p>
+
+  1. Click **Save**.
+
+1. (Optional) Enable developers to upgrade service instances individually. For instructions, see
+[Enable Individual Service Instance Upgrades](#individual-upgrades) below. <br>
+When this is feature is not enabled, the `upgrade-all-service-instances` errand runs by default
+after each upgrade.
+For more information, see [Upgrading All Service Instances](#all-instances) below.
+
+1. Go to the <%= vars.ops_manager %> **Installation Dashboard**. Click **Review Pending Changes** and **Apply Changes**.
+
+### <a id="individual-upgrades"></a> Enable Individual Service Instance Upgrades
+
+Until you upgrade service instances, they do not benefit from any security fixes or new features
+included in the tile upgrade.
+The default upgrade path automatically upgrades all on-demand service instances
+when you upgrade the tile.
+This operation can take a long time.
+
+To expedite upgrades, in <%= vars.product_short %> v2.3 and later you can enable on-demand service
+instances to be upgraded individually.
+This allows developers to upgrade their own service instances after you have upgraded the tile.
+
+<p class="note"><strong>Note:</strong>
+  This feature is only available for upgrades from <%= vars.product_short %> v2.3.0 to later versions.
+  You cannot upgrade individual service instances from v2.2 to v2.3.
+</p>
+
+To enable upgrading individual service instances:
+
+1. Ensure that all service instances have been upgraded to <%= vars.product_short %> v2.3.0 or later.
+If not, click **Apply changes** to run the `upgrade-all-service instances` errand.
+
+1. In <%= vars.product_short %> tile, navigate to the **Errands** page.
+
+1. Select **Off** for the **Upgrade All On-Demand Service Instances** errand:
+
+    <img src="./images/upgrade-all-disabled.png" alt="The 'Errands' pane in Ops Manager.
+    The 'Upgrade All On-Demand Service Instances' section is shown, and 'Off' is selected.">
+    <a href="./images/upgrade-all-disabled.png" target="_blank" aria-hidden="true">
+      Click here to view a larger version of this image</a>
+
+1. Click **Save**.
+
+1. Click **Apply changes**.
+
+After you enable individual service instance upgrades, developers can upgrade individual
+service instances following the instructions in
+[Upgrading an Individual Redis Service Instance](./dev-upgrade.html).
+
+
+## <a id="downtime"></a> Downtime During Upgrades
+
+During the upgrade each Redis instance experiences a small period of
+downtime as each instance is updated with the new software components.
+This downtime is because Redis instances are single VMs operating in a non-high availability (HA) setup.
+To reduce downtime, you can enable the BOSH HotSwaps feature.
+Compared to traditional BOSH upgrades, this feature has been shown to reduce downtime by 75%.
+For instructions on how to enable this feature, see [Enable BOSH HotSwaps to Reduce Downtime](#bosh-hotswaps) below.
+
+The length of downtime depends on whether there is a stemcell update to
+replace the operating system image, or whether the Redis software is updated
+on the existing VM.
+Stemcell updates incur additional downtime while the IaaS creates the new VM,
+whereas updates without a stemcell update are faster.
+
+<%= vars.ops_manager %> ensures the instances are updated with the new packages and any
+configuration changes are applied automatically.
+
+Upgrading to a newer version of the product does not cause any loss of data or configuration.
+
+###  <a id="downtime-causes"></a> Causes of Downtime
+
+A redeploy causes downtime for the <%= vars.product_short %> tile.
+This section clarifies what events trigger a redeploy.
+
+#### <a id="opsman"></a> Changes in <%= vars.ops_manager %>
+
+In <%= vars.ops_manager %>, any field that changes the manifest causes a redeploy
+of the <%= vars.product_short %> tile.
+
+#### <a id="pas"></a> Changes in <%= vars.app_runtime_full %>
+
+In the <%= vars.app_runtime_full %> tile, changes to any of the following properties can trigger downtime:
+<ul>
+  <li><code>$runtime.system\_domain</code>---Runtime System Domain</li>
+  <li><code>..cf.ha\_proxy.skip\_cert\_verify.value</code>---Disable SSL certificate verification for this environment in <%= vars.app_runtime_abbr %></li>
+  <li><code>$runtime.apps\_domain</code>---Runtime Apps Domain </li>
+  <li><code>..cf.nats.ips</code>---NATS Resource Config</li>
+  <li><code>$self.service\_network</code>---Service Networks in <%= vars.ops_manager %></li>
+</ul>
+
+When the operator applies any of the above changes to <%= vars.app_runtime_abbr %>, downtime is triggered for:
+
+* The Redis on-demand broker
+
+* Shared-VM Services
+
+#### <a id="all-instances"></a> Upgrading All Service Instances
+
+Downtime for service instances occurs only after the operator runs the
+`upgrade-all-service-instances` BOSH errand, after all tile upgrades are completed successfully.
+Any change to a field on the <%= vars.product_short %> tile causes BOSH to redeploy the
+on-demand Redis broker and can cause service instance downtime when the operator runs the
+`upgrade-all-service-instances` errand.
+
+### <a id="bosh-hotswaps"></a> Enable BOSH HotSwaps to Reduce Downtime
+
+Enabling BOSH HotSwaps reduces the downtime for on-demand service instances when
+upgrading.
+Benchmarking shows that enabling BOSH HotSwaps can reduce service instance downtime
+by 75% when upgrading.
+For how it works, see
+<a href="https://bosh.io/docs/changing-deployment-vm-strategy/">Changing VM Update Strategy</a>
+in the BOSH documentation.
+To use this feature, all service bindings must use BOSH DNS instead of IP addresses.
+
+To enable BOSH HotSwaps:
+
+1. Ensure all service bindings use BOSH DNS.
+To do so, tell developers to unbind, bind, and restage any apps created while
+<%= vars.product_old %> v1.14 or earlier was installed.
+For instructions, see the solution in [Apps Fail to Connect to the Service Instance](./troubleshoot-instances.html#connect-fails).
+  <p class="note"><strong>Note:</strong>
+    You must do this before enabling BOSH HotSwaps.
+    Any apps with service bindings that do not use BOSH DNS fail to connect
+    to the Redis service instance.</p>
+
+1. Select the **BOSH HotSwaps** checkbox in the **On-Demand Service Settings** tab.
+
+1. Click **Save** and **Apply Changes**.
+
+
+## <a id="network-upgrades"></a> Network Changes after Deployment
+
+This section explains how changing the network after deploying <%= vars.product_short %>
+affects instances and apps.
+
+### <a id="network-upgrades-shared-vms"></a> Shared VMs
+
+To change the network for shared-VM services,
+click **Assign AZs and Networks** in the <%= vars.product_short %> tile configuration and use the **Network** dropdown.
+
+You can also change the network by altering the CIDR in the BOSH Director tile.
+
+VMware discourages changing the network that a pre-existing shared-VM deployment works with.
+
+If the network is changed, app bindings for existing shared-VM instances might stop working.
+
+### <a id="network-upgrades-on-demand"></a> On-Demand Service Instances
+
+To change the service network for on-demand service instances,
+click **Assign AZs and Networks** in the Redis tile configuration and use the **Service Network** dropdown.
+The service network applies to on-demand service instances.
+
+You can also change the service network by altering the CIDR in the BOSH Director tile.
+
+If you change the service network, you must unbind and rebind existing apps to the on-demand Redis instance.
+
+New on-demand service instances are placed into the new service network,
+but existing on-demand service instances are not moved.
+To move the data in on-demand Redis instances to a new service network, you must create a new instance, migrate the data manually, and delete the old instance.
+
+Similarly, changing the availability zone (AZ) for an on-demand plan only applies to new on-demand instances
+and does not alter existing instances.
+
+
+## <a id="policy"></a> Release Policy
+
+<%# The below partial is in https://github.com/pivotal-cf/docs-partials %>
+
+<%= partial vars.path_to_partials + '/services/release-policy', :locals => {
+  :os_name => "Redis"
+} %>

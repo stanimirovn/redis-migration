@@ -1,0 +1,826 @@
+---
+title: Installing Redis for VMware Tanzu Application Service
+owner: London Services
+---
+
+<strong><%= modified_date %></strong>
+
+This topic describes the process of installing <%= vars.product_full %>.
+It covers tasks from downloading the file from <%= vars.product_network %>
+through verifying the installation after configuration.
+
+## <a id="rbac"></a>Role-Based Access in <%= vars.ops_manager %>
+
+<%= vars.ops_manager %> admins can use Role-Based Access Control (RBAC) to manage which
+operators can make deployment changes, view credentials, and manage user roles in <%= vars.ops_manager %>.
+Therefore, your role permissions might not allow you to follow every procedure in this operator guide.
+
+For more information about roles in <%= vars.ops_manager %>, see [Understand Roles in <%= vars.ops_manager %>](https://docs.pivotal.io/platform/opsguide/config-rbac.html#about).
+
+## <a id="install"></a>Download and Install the Tile
+
+To add <%= vars.product_short %> to <%= vars.ops_manager %>, follow the procedure for adding <%= vars.ops_manager %> tiles:
+
+1. Download the <%= vars.product_short %> file from [<%= vars.product_network %>](https://network.pivotal.io/products/p-redis).
+Select the latest release from the **Releases** dropdown.
+1. In the <%= vars.ops_manager %> Installation Dashboard, click **Import a Product** to upload the <%= vars.product_short %> file.
+1. Click the **+** sign next to the uploaded product description to add the tile to your staging area.
+1. To configure <%= vars.product_short %>, click the newly added tile. See configuration instructions in the sections below.
+1. After completing the required configuration, in the <%= vars.ops_manager %> Dashboard, do the following to complete the installation:
+
+    1. If you are using <%= vars.ops_manager %> v2.3 or later, click **Review Pending Changes**.
+    For more information about this <%= vars.ops_manager %> page, see
+    [Reviewing Pending Product Changes](https://docs.pivotal.io/platform/customizing/review-pending-changes.html).<br><br>
+    1. Click **Apply Changes**.
+
+For guidance on ports and ranges used in the Redis service, see [Select Networks](#network-configuration) below.
+
+## <a id="azs"></a>Assign AZs and Networks
+
+To assign AZs and networks, click the **Assign AZs and Networks** settings tab.
+
+![The Redis tile in Ops Manager. The 'Assign AZs and Networks' pane is active.
+See the next section for information about configuring this pane.](AZ-assignment.png)
+
+### <a id="az-config"></a>Assign AZs
+
+You can assign multiple availability zones (AZs) to Redis jobs, however this does not ensure high availability.
+You must select AZs that are in the service network you configured in your BOSH Director.
+For more information, see [Availability Zones](erc.html#other-notes).
+
+To assign AZs:
+
+1. Select **Assign AZs and Networks**.
+
+1. Under **Place singleton jobs in**, select an AZ for the on-demand or shared service broker VM, and any shared instances.
+
+1. Under **Balance other jobs in**, select the AZs that you want the broker to balance on-demand service instances across.
+
+1. Click **Save**.
+
+### <a id="network-configuration"></a>Select Networks
+
+You can use <%= vars.product_short %> with or without using the on-demand service.
+To use the <%= vars.product_short %> on-demand service, you must select a network in which
+the service instances are created.
+For more information, see [Networking for On-Demand Services](./odnetworking.html).
+
+To select networks:
+
+1. In the **Assign AZs and Networks** tab, select a **Network**.
+  - VMware recommends that each type of service run in its own network.
+  - Typically the service broker network and service instance networks are the same.
+
+1. If using the on-demand service, select a **Service Network**.
+Otherwise, select an empty service network.
+For more information, see [Creating an Empty Services Network when using on-demand Service Tiles for Non-On-Demand Usage Only](https://community.pivotal.io/s/article/Creating-an-Empty-Services-Network-when-using-on-demand-Service-Tiles-for-Non-On-Demand-Usage-Only) in the VMware Tanzu Support knowledge base.
+
+
+The following ports and ranges are used in <%= vars.product_short %>:
+
+<table class="nice">
+  <tr><th>Port</th>
+    <th>Protocol</th>
+    <th>Direction and Network</th>
+    <th>Purpose</th></tr>
+  <tr>
+    <td>
+      8202
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Inbound to the Cloud Foundry network<br>
+      Outbound from the service broker and service instance networks
+    </td>
+    <td>
+      Allows Redis <code>metron_agent</code> to forward metrics to the Cloud Foundry Loggregator
+    </td>
+  </tr>
+  <tr>
+    <td>
+      12350
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Outbound from Cloud Foundry to the <code>cf-redis-broker</code> service broker network
+    </td>
+    <td>
+      Allows the cloud controllers to access the <code>cf-redis-broker</code>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      8080
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Outbound from Cloud Foundry to the on-demand service broker network
+    </td>
+    <td>
+      Allows the cloud controllers to access the on-demand service broker when using an on-demand service
+    </td>
+  </tr>
+  <tr>
+    <td>
+      6379
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Outbound from Cloud Foundry to any on-demand service instance networks
+    </td>
+    <td>
+      Allows the Diego Cell and Diego Brain networks to access all on-demand service instances
+    </td>
+  </tr>
+  <tr>
+    <td>
+      16379
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Outbound from Cloud Foundry to any on-demand service instance networks
+    </td>
+    <td>
+      This port allow the Diego Cell and Diego Brain networks to access all on-demand service instances.<br>
+      This access is only required if TLS is set to <strong>optional</strong>.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      32768&ndash;61000
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Outbound from Cloud Foundry to the <code>cf-redis-broker</code> service broker network
+    </td>
+    <td>
+      These ports allow Diego Cell and Diego Brain networks to access the service broker VM. This access is only required for the shared service plan.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      80
+    </td>
+    <td>
+      http
+    </td>
+    <td>
+      Outbound from any service instance networks
+    </td>
+    <td>
+      Gives access to the backup blobstore when using service backups
+    </td>
+  </tr>
+    <tr>
+      <td>
+        443
+      </td>
+    <td>
+      https
+    </td>
+    <td>
+      Outbound from any service instance networks
+    </td>
+    <td>
+      Gives access to the backup blobstore when using service backups
+    </td>
+  </tr>
+  <tr>
+    <td>
+      8443 and 25555
+    </td>
+    <td>
+      TCP
+    </td>
+    <td>
+      Outbound from any on-demand service broker network to the BOSH Director network
+    </td>
+    <td>
+      Allows the on-demand service broker to communicate with the BOSH Director
+    </td>
+  </tr>
+</table>
+
+## <a id="on-demand-config"></a>Configure On-Demand Service Settings
+
+To configure settings that apply across the whole on-demand service offering:
+
+1. In the <%= vars.product_short %> tile, select **On-Demand Service Settings**.
+![The Redis tile in Ops Manager. The 'On-Demand Service Settings' pane is active.
+See the next steps for information about configuring this pane.](redis-odservice-settings.png)
+<a href="./images/redis-odservice-settings.png" target="_blank" aria-hidden="true">
+  Click here to view a larger version of this image</a>
+
+1. Enter the **Maximum service instances across all on-demand plans**.
+   The maximum number of instances you set for all your on-demand plans combined cannot exceed this number.<br />
+   For more information, see [Setting Limits for On-Demand Service Instances](./set-quotas.html).
+
+1. Select the **Allow outbound internet access from service instances** checkbox.
+   You must select this checkbox to allow external log forwarding, send backup artifacts to external destinations,
+   and communicate with an external BOSH blobstore.
+  <p class="note"><strong>Note</strong>: Outbound network traffic rules also depend on your IaaS settings.
+      Consult your network or IaaS admin to ensure that your IaaS allows outbound traffic to the external networks you need.</p>
+
+1. (Optional) Select the checkbox to enable **Service Instance Sharing**.
+   Turning on sharing enables this feature for all on-demand instances.
+    <p class="note"><strong>Note</strong>: To enable this feature a user with admin privileges
+  must run <code>cf enable-feature-flag service\_instance\_sharing</code>.
+ For information about this feature, see <a href="./using.html#sharing">Sharing a Redis Instance with Another Space</a>.
+  </p>
+
+1. (Optional) Use the **Maximum Parallel Upgrades** field to configure the
+maximum number of Redis service instances that can be upgraded at the same time.
+<br><br>
+  When you click **Apply Changes**, the on-demand broker upgrades all service instances.
+  By default, each instance is upgraded serially.
+  Allowing parallel upgrades reduces the time taken to apply changes.
+  <p class="note"><strong>Note</strong>:
+    Multiple Redis service instances are concurrently unavailable during the upgrade.
+  </p>
+
+1. (Optional) Use the **Number of Canaries to run before proceeding with upgrade** field
+and the **Specify Org and Space that Canaries will be selected from?** options to specify
+settings for upgrade canaries.
+Canaries are service instances that are upgraded first.
+The upgrade fails if any canaries fail to upgrade. <br><br>
+You can limit canaries by number and by org and space.
+To use all service instances in an org and space as canaries,
+set the number of canaries to zero. This upgrades all service instances in the selected org and space first.<br><br>
+  ![A flowchart that describes canary options. See below for a detailed description.](canary-options.png)
+  The flowchart above has the following information:
+    - Is the org and space specified?
+        - **Yes**: Is the number of canaries specified?
+          - **Yes**: The number of canaries is limited by org and space.
+          - **No**: All canaries from the org and space.
+        - **No**: Is the number of canaries specified?
+          - **Yes**: The number of canaries is chosen non-deterministically.
+          - **No**: No canaries.
+
+    <p class="note"><strong>Note:</strong>
+      If you specify that canaries should be limited to an org and space that has
+      no service instances, the upgrade fails.
+    </p>
+    <p class="note"><strong>Note:</strong>
+      Canary upgrades comply with the Maximum Parallel Upgrades settings.
+      If you specify three canaries and a Maximum Parallel Upgrades of two,
+      then two canaries upgrade, followed by the third.
+    </p>
+For information about this feature, see `canaries` in
+[Upgrade All Service Instances](https://docs.pivotal.io/svc-sdk/odb/operating.html#upgrade-all-instances)
+in the On-Demand Services SDK documentation.
+
+1. (Optional) Select the checkbox to enable **BOSH HotSwaps**.
+This reduces downtime during upgrades.
+For how this feature works, see
+<a href="https://bosh.io/docs/changing-deployment-vm-strategy/">Changing VM Update Strategy</a> in the BOSH documentation.
+
+8. (Optional) Select **Yes** to enable **On Demand - Secure Service Instance Credentials with Runtime CredHub**.
+
+     <p class="note">
+   <strong>Note:</strong> If you select **Yes**, you must also follow the steps in
+           <a href="#secure-credentials">Enable Secure Service Instance Credentials
+           for On-Demand Redis</a> below.
+    </p>
+
+1. (Optional) Select the **Not Configured** option under **Enable TLS** if you do not want to allow TLS connections to on-demand service instances. TLS support is optional in new installations by default. If TLS is configured in <%= vars.product_short %> v2.2, follow the procedures in <a href="./preparing-tls.html">Preparing for TLS</a> before enabling TLS.
+<%= partial vars.path_to_partials + '/redis/warning-disabling-tls' %>
+
+1. (Optional) If you selected the **Optional** option under **Enable TLS**, select the check box next
+to each TLS version you want to support.
+<p class="note">
+  <strong>Note:</strong>
+  Selecting <strong>TLS optional</strong> does not enforce the use of TLS. After deploying the tile, notify developers that they must unbind, bind, and restage existing service instances to ensure Spring and Steeltoe apps use TLS.
+  Further configuration might be needed for other frameworks and languages to ensure use of the TLS port.
+</p>
+
+1. (Optional) If you selected the **Enforced** option under **Enable TLS**, enable the checkbox next
+to each TLS version you want to support. The **Enforced** option requires TLS to be enabled.
+<p class="note breaking">
+  <strong>Breaking Change:</strong> If TLS is set to <strong>Enforced</strong> then all existing
+  service instances use TLS after changes from the <strong>Upgrade All Service Instances</strong>
+  errand are applied. Any apps not using TLS are no longer able to communicate with their service
+  instances. Such apps require a new binding and must be configured to communicate with their
+  <%= vars.product_short %> service instance through TLS.
+</p>
+
+1. (Optional) If you selected the **Optional** or **Enforced** option under **Enable TLS** then select the TLS versions to support.
+TLS v1.3 and TLS v1.2 are enabled by default.
+VMware recommends supporting TLS v1.1 and later. VMware does not recommend supporting TLS v1.0
+because it is less secure than later versions, but it is an option for apps that only support this
+protocol.
+<p class="note">
+  <strong>Note:</strong> After selecting a TLS version, VMware recommends generating a new service
+  key and then rebinding the service instance with the new service key.
+  This makes the service key's <code>tls_versions</code> field reflect the new TLS version, which can
+  help developers who use the service key to see the supported TLS version.
+  To create a new service key, follow the steps in <a href="./appdevs.html#check-availability-tls">Check Availability</a>.
+  To rebind the instance, follow the steps in <a href="./appdevs.html#existing-apps">Bind Existing Apps with TLS</a>.
+</p>
+
+1. (Optional) To add an endpoint to service instances for developers to query Redis
+configuration parameters, select the **Enable Config API** checkbox.
+For more information, see [Using the Config API](using-api.html).
+
+1. (Optional) In the **Tags** field, write a comma-separated list of key-value pairs for tagging
+service-instance VMs. Ensure the list is in a style that the underlying cloud provider accepts.
+For example, Google Cloud Platform (GCP) does not permit uppercase characters.
+
+
+## <a id="on-demand-plan-config"></a>Configure On-Demand Plan Settings
+
+You can configure multiple on-demand plans with memory and disk sizes suited to different use cases.
+The configuration of resources varies depending on your IaaS.
+
+To add and configure each on-demand service plan:
+
+1. In the <%= vars.product_short %> tile, select **On-Demand Plans**.
+  ![The Redis tile in Ops Manager. The 'On-Demand Plans' pane is active.](on-demand-config.png) <a id="ondemandconfig"></a>
+  <a href="./images/on-demand-config.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+1. Click **Add** to add an on-demand plan.
+  ![The Redis tile in Ops Manager. The 'On-Demand Plans' pane is active. See the next step for information about configuring this pane.](on-demand-plan-config.png) <a id="ondemandplanconfig"></a>
+  <a href="./images/on-demand-plan-config.png" target="_blank" aria-hidden="true">
+    Click here to view a larger version of this image</a>
+1. Configure the settings in the table below for your on-demand plans and then click **Save**.
+<%# Should you not reduce the the VMs or disk after you have saved settings or while you are configuring for the first time? %>
+  <p class="warning note"><strong>Warning:</strong> Do not downsize the VMs
+   or disk size. Doing so can cause data loss in pre-existing instances.
+  </p>
+
+    <table class="nice">
+    <th>Field</th>
+    <th>Default</th>
+    <th>Description</th>
+    <tr>
+      <td><strong>Plan Name</strong></td>
+      <td>on-demand-cache</td>
+      <td>
+        The name that you choose for the plan. This is displayed in the Marketplace.
+        VMware recommends that you give your plans descriptive names based on their configuration.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Plan Description</strong></td>
+      <td>This plan provides an on-demand Redis instance, tailored for caching use cases with persistence to disk enabled.</td>
+      <td>
+        The description that you write for your plan. This is displayed in the Marketplace.
+        Include details that are relevant to app developers.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Plan ID</strong></td>
+      <td>Empty</td>
+      <td>
+        An ID that you configure when recovering deleted plans.
+        Leave this field blank unless it is already configured or you are recovering a deleted plan.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Plan Quota</strong></td>
+      <td>20</td>
+      <td>
+        The maximum number of instances of this plan that app developers can create.
+        For more information, see <a href="./set-quotas.html">Setting Limits for On-Demand Service Instances</a>.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>CF Service Access</strong></td>
+      <td>Enabled for all orgs and spaces</td>
+      <td>This setting does not modify the permissions that have been previously set,
+          and allows for manual access to be configured from the CLI.</td>
+    </tr>
+    <tr>
+      <td><strong>AZ to deploy Redis instances of this plan</strong></td>
+      <td>None selected</td>
+      <td>The AZs in which to deploy the Redis instances from the plan.
+          These must be AZs of the service network, which are configured in the BOSH Director tile.
+          If you select multiple AZs, instances are distributed randomly between them.</td>
+    </tr>
+    <tr>
+      <td><strong>Server VM type</strong></td>
+      <td>Varies depending on IaaS</td>
+      <td>VMware recommends that the persistent disk is at least 2.5x the VM memory for on-demand service instances.</td>
+    </tr>
+    <tr>
+      <td><strong>Server Disk type</strong></td>
+      <td>Varies depending on IaaS</td>
+      <td>VMware recommends that the persistent disk is at least 2.5x the VM memory for on-demand service instances.</td>
+    </tr>
+    <tr>
+      <td><strong>Redis Client Timeout</strong></td>
+      <td>3600</td>
+      <td>The server timeout for an idle client specified in seconds.
+          Adjust this setting as needed.</td>
+    </tr>
+    <tr>
+      <td><strong>Redis TCP Keepalive</strong></td>
+      <td>60</td>
+      <td>The interval in seconds at which TCP ACKs are sent to clients.
+          Adjust this setting as needed.</td>
+    </tr>
+    <tr>
+      <td><strong>Max Clients</strong></td>
+      <td>1000</td>
+      <td>The maximum number of clients that can be connected at any one time.
+          Adjust this setting as needed.</td>
+    </tr>
+    <tr>
+      <td><strong>Lua Scripting</strong></td>
+      <td>Disabled</td>
+      <td>VMware recommends keeping Lua scripting disabled unless developers are running apps that require Lua scripting, such as .Net Steeltoe apps.<br>
+      Verify that your apps are using a language that does not require Lua scripting.</td>
+    </tr>
+    <tr>
+      <td><strong>Paid Plan</strong></td>
+      <td>Disabled</td>
+      <td>Select this check box to indicate that this service plan is paid.
+        The plan is marked with an asterisk in the <code>cf marketplace</code> list and labeled
+        "paid" in the "free or paid" column when individual plans are listed.</td>
+    </tr>
+    </table>
+
+
+### <a id="secure-credentials"></a> Enable Secure Service Instance Credentials for On-Demand Redis
+
+If you enabled **On Demand - Secure Service Instance Credentials with Runtime CredHub**
+in step 8 of [Configure On-Demand Service Settings](#on-demand-config) above,
+you must follow this procedure.
+
+To secure your on-demand binding credentials in runtime [CredHub](https://docs.pivotal.io/platform/credhub/)
+instead of the Cloud Controller database (CCDB):
+
+1. On the **CredHub** pane of <%= vars.app_runtime_full %> (<%= vars.app_runtime_abbr %>)
+   select **Secure service instance credentials**.
+
+    For instructions, see [Configure CredHub](https://docs.pivotal.io/application-service/2-11/operating/configure-pas.html#credhub)
+in _Configuring TAS for VMs_.
+
+1. After deploying the tile, notify developers that they must unbind and rebind
+existing service instances to secure their credentials with CredHub.
+
+### <a id="change-on-demand"></a>Updating On-Demand Service Plans
+
+Operators can update certain settings after the plans have been created.
+If the operator updates the VM size, disk size, or the Redis configuration settings
+(enabling Lua Scripting, max-clients, timeout and TCP keepalive),
+these settings are implemented in all instances that are already created.
+
+Operators should not downsize the VMs or disk size because this can cause data loss in pre-existing instances.
+Additionally, operators cannot make a plan that was previously active, inactive, until all instances of that plan have been deleted.
+
+### <a id="remove-on-demand-plan"></a>Remove an On-Demand Service Plan
+
+<p class="warning note"><strong>Warning:</strong>
+  Do not remove an on-demand service plan with service instances deployed.
+  Doing so causes <strong>Apply Changes</strong> to fail.
+  For how to recover a deleted plan, see
+  <a href="https://community.pivotal.io/s/article/Recover-a-deleted-Redis-for-Pivotal-Platform-Plan">Recover a deleted <%= vars.product_short %> On-Demand Plan</a>
+  in the VMware Tanzu Support knowledge base.
+</p>
+
+To remove an on-demand service plan from your tile:
+
+1. Ensure that there are no deployed service instances of the plan by running:
+
+    ```
+    cf services
+    ```
+
+    For example:
+    <pre class="terminal">
+    $ cf services
+    Getting services in org my-org / space my-space as user<span>@</span>example.com...
+    OK
+    name          service     plan              bound apps    last operation
+    my-instance   p.redis     on-demand-cache                 create succeeded
+    </pre>
+
+1. In the <%= vars.product_short %> tile, select **On-Demand Plan Settings**.
+
+1. Delete the plan by clicking the trash can icon next to the plan name.
+
+1. Click **Save**.
+
+1. Navigate to the **Errands** page on the <%= vars.product_short %> tile, and set
+the **Register On-Demand Broker** errand to **on**.
+This updates the plans available in the Marketplace.
+
+### <a id="remove-on-demand"></a>Remove All On-Demand Service Plans
+
+<p class="warning note"><strong>Warning:</strong>
+  Do not remove an on-demand service plan with service instances deployed.
+  Doing so causes <strong>Apply Changes</strong> to fail.
+  For how to recover a deleted plan, see
+  <a href="https://community.pivotal.io/s/article/Recover-a-deleted-Redis-for-Pivotal-Platform-Plan">Recover a deleted <%= vars.product_short %> On-Demand Plan</a>
+  in the VMware Tanzu Support knowledge base.
+</p>
+
+To remove the on-demand service from your tile:
+
+1. In the <%= vars.product_short %> tile, select **Resource Config**
+
+1. Set the **Redis On-Demand Broker** job instances to 0.
+
+1. Navigate to the **Errands** page on the <%= vars.product_short %> tile, and set the following errands to **off**:
+    * Register On-Demand Broker
+    * On-Demand Broker Smoke Tests
+    * Upgrade All On-Demand Service Instances
+    * Delete All Service Instances and Deregister On-Demand Broker
+
+1. Create an empty service network. For instructions, see
+[Creating an Empty Services Network when using on-demand Service Tiles for Non-On-Demand Usage Only](https://community.pivotal.io/s/article/Creating-an-Empty-Services-Network-when-using-on-demand-Service-Tiles-for-Non-On-Demand-Usage-Only) in the VMware Tanzu Support knowledge base.
+
+1. Go to each **On-Demand Plans** page on the <%= vars.product_short %> tile,
+and delete each plan by clicking the trash can icon next to the plan name.
+<%# Maybe a new image here %>
+
+##  <a id="shared-vm-config"></a>Configure Shared-VM Plan Settings
+
+To configure shared-VM service plans:
+
+1.  In the <%= vars.product_short %> tile, select **Shared-VM Plan**.
+![The Redis tile in Ops Manager. The 'Shared-VM Plan' pane is active. See the next step for information about configuring this pane.](shared-vm-config.png)
+
+1.  Configure these fields:
+      * **Redis Instance Memory Limit**---Enter the maximum memory used by a shared-VM instance, for example 512&nbsp;MB.
+      * **Redis Service Instance Limit**---Enter the maximum number of shared-VM instances.
+      * **Lua Scripting**---Enable or disable Lua Scripting as needed using this checkbox.
+      VMware recommends that Lua Scripting is disabled unless developers need it to be enabled.
+
+ 	Memory and instance limits depend on the total system memory of your Redis broker VM and require some
+ 	additional calculation. For more information, see [Memory Limits for Shared-VM Plans](#shared-vm-memory-limits) below.
+
+1. Click **Save**.
+
+1. If you do not want to use the on-demand service, you must make all of the on-demand service plans inactive.
+Click the tab for each on-demand plan, and select **Plan Inactive**.
+See the example in Step 4 of [Remove On-Demand Service Plans](#remove-on-demand) above.
+
+1. To change the allocation of resources for the Redis broker, click the **Resource Config** tab.
+    <br><br>The Redis broker server runs all of the Redis instances for your shared-VM plan.
+    From the **Resource Config** page, you can change the CPU, RAM, Ephemeral Disk, and Persistent Disk made available, as needed.
+
+### <a id="shared-vm-memory-limits"></a>Configure Memory Limits for Shared-VM Plans
+
+Additional calculation is required to configure memory limits for shared-VM plans.
+With these plans, several service instances share the VM, and the Redis broker also runs on this same VM.
+Therefore, the memory used by all the shared-vm instances combined should be at most 45% of the memory of the Redis broker VM.
+
+To configure the limits in these fields:
+
+1. Estimate the combined maximum memory that all your Redis shared-VM instances can use.
+
+1. If your estimate is higher than 45% of the Redis broker VM's total system memory, do any of the following:
+    + Decrease the **Redis Instance Memory Limit** in the **Shared-VM Plan** tab.
+    + Decrease the number of instances in **Redis Service Instance Limit** in the **Shared-VM Plan** tab.
+    + Increase the RAM for the Redis Broker in the **Resource Config** tab as shown below.
+    <img src="./images/redis-broker-resource.png" alt="The Redis tile in Ops Manager.
+    The 'Resource Config' pane is active. See below for information about configuring this pane.">
+    <a href="./images/redis-broker-resource.png" target="_blank" aria-hidden="true">
+      Click here to view a larger version of this image</a>
+
+    Here are some examples for setting these limits:
+
+    <table border="1" class="nice">
+        <tr>
+          <th>Redis Broker VM Total Memory</th>
+          <th>Redis Instance Memory Limit</th>
+          <th>Redis Service Instance Limit</th>
+        </tr>
+        <tr>
+          <td>16&nbsp;GB</td>
+          <td>512&nbsp;MB</td>
+          <td>14</td>
+        </tr>
+        <tr>
+          <td>16&nbsp;GB</td>
+          <td>256&nbsp;MB</td>
+          <td>28</td>
+        </tr>
+        <tr>
+          <td>64&nbsp;GB</td>
+          <td>512&nbsp;MB</td>
+          <td>56</td>
+        </tr>
+    </table>
+
+    <p class="note"><strong>Note:</strong> You can configure a larger
+      <strong>Redis Service Instance Limit</strong>, if you are confident that the
+      majority of the deployed instances do not use a large amount of their allocated memory,
+      for example in development or test environments.<br><br>
+      However, this practice is not supported and can cause your server to run out of memory,
+      preventing users from writing any more data to any Redis shared-VM instance.
+      Do not use shared-VM instances in production environments.
+    </p>
+
+
+### <a id="resources"></a>Configure Resources for Shared-VM Plans
+
+To configure resources for the shared-VM plans, click the **Resource Config** settings tab on the <%= vars.product_short %> tile. The shared-VM plan is on the **Redis Broker** resource.
+
+The following are the default resource and IP requirements for <%= vars.product_short %> when using the shared-VM plans:
+<table border="1" class="nice">
+  <tr>
+    <th>Product</th>
+    <th>Resource</th>
+    <th>Instances</th>
+    <th>CPU</th>
+    <th>Ram</th>
+    <th>Ephemeral</th>
+    <th>Persistent</th>
+    <th>Static IP</th>
+    <th>Dynamic IP</th>
+  </tr>
+  <tr>
+    <td>Redis</td>
+    <td>Redis Broker</td>
+    <td>1</td>
+    <td>2</td>
+    <td>3072</td>
+    <td>4096</td>
+    <td>9216</td>
+    <td>1</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Redis</td>
+    <td>Broker Registrar</td>
+    <td>1</td>
+    <td>1</td>
+    <td>1024</td>
+    <td>2048</td>
+    <td>0</td>
+    <td>0</td>
+    <td>1</td>
+  </tr>
+  <tr>
+    <td>Redis</td>
+    <td>Broker De-Registrar</td>
+    <td>1</td>
+    <td>1</td>
+    <td>1024</td>
+    <td>2048</td>
+    <td>0</td>
+    <td>0</td>
+    <td>1</td>
+  </tr>
+  <tr>
+    <td>Redis</td>
+    <td>Compilation</td>
+    <td>2</td>
+    <td>2</td>
+    <td>1024</td>
+    <td>4096</td>
+    <td>0</td>
+    <td>0</td>
+    <td>1</td>
+  </tr>
+</table>
+
+VMware recommends that the persistent disk is at least 3.5x the VM memory for the shared-VM.
+
+### <a id="disable-shared"></a>Disable Shared VM Plans
+
+You can disable shared-VM plans by doing the following while configuring the Redis tile:
+
+1. Ensure at least one on-demand plan is active.
+
+1. Click the **Shared-VM** tab.
+
+1. Set **Redis Service Instance Limit** to 0.
+
+1. Click **Save**.
+
+1. Click the **Errands** tab and configure the settings as follows:
+
+    1. Set **Broker Registrar** to Off.
+    1. Set **Smoke Tests** to Off.
+    1. Set **Broker Deregistrar** to Off.
+    1. Leave all four on-demand errands On.
+
+1. Click **Save**.
+
+1. Click the **Resource Config** tab.
+
+1. For **VM Type** and **Persistent Disk Type**, leave the configurations as they are or increase the sizes. It is not possible to decrease the sizes.
+
+1. Click **Save** if you changed the sizes.
+
+## <a id="syslog"></a>Configure Syslog Forwarding
+
+VMware recommends that operators configure syslog forwarding to a remote destination.
+Forwarding your system logs to a remote destination lets you:
+
+* View logs from every VM in the <%= vars.product_short %> deployment in one place.
+* Effectively troubleshooting when logs are lost on the source VM.
+* Set up alerts for important error logs to monitor the deployment.
+
+All logs follow RFC5424 format.
+
+To configure syslog forwarding:
+
+
+<%= partial(vars.path_to_partials + '/ops-manager/syslog_bosh', :locals => { :syslog_context => vars.product_short }) %>
+
+## <a id="stemcell"></a> Verify the Stemcell
+
+To verify that you have the correct stemcell, follow the procedure in
+[Importing and Managing Stemcells](https://docs.pivotal.io/ops-manager/opsguide/managing-stemcells.html).
+
+## <a id="apply"></a> Apply Changes from Your Configuration
+
+To apply your configuration changes:
+
+1. Return to the <%= vars.ops_manager %> Installation Dashboard.
+
+1. In the <%= vars.ops_manager %> Dashboard, do the following to complete the installation:
+
+    1. If you are using <%= vars.ops_manager %> v2.3 or later, click **Review Pending Changes**.
+    For more information about this <%= vars.ops_manager %> page, see
+    [Reviewing Pending Product Changes](https://docs.pivotal.io/platform/customizing/review-pending-changes.html).<br><br>
+    1. Click **Apply Changes**.
+
+
+##  <a id="asg"></a> Create App Security Groups
+
+To allow this service to have network access,
+you must create [App Security Groups (ASGs)](https://docs.pivotal.io/application-service/concepts/asg.html).
+Ensure your security group allows access to the Redis Service Broker VM configured in your deployment.
+You can obtain the IP addresses for these VMs in <%= vars.ops_manager %> under the <strong>Resource Config</strong> section for the <%= vars.product_short %> tile.</p>
+
+<p class="note"><strong>Note:</strong> Without ASGs, this service is unusable.</p>
+
+### App Container Network Connections
+
+App containers that use instances of <%= vars.product_short %> require the following outbound network connections:
+
+<table><thead>
+<tr>
+<th>Destination</th>
+<th>Ports</th>
+<th>Protocol</th>
+<th>Reason</th>
+</tr>
+</thead><tbody>
+<tr>
+<td><code>ASSIGNED_NETWORK</code></td>
+<td>32768-61000</td>
+<td>TCP</td>
+<td>To enable apps to access shared-VM service instances</td>
+</tr>
+<tr>
+<td><code>ASSIGNED_NETWORK</code></td>
+<td>6379</td>
+<td>TCP</td>
+<td>To enable apps to access on-demand service instances</td>
+</tr>
+<tr>
+<td><code>ASSIGNED_NETWORK</code></td>
+<td>16379</td>
+<td>TCP</td>
+<td>To enable apps to have TLS encrypted access to on-demand service instances</td>
+</tr>
+</tbody></table>
+
+Create an ASG called `redis-app-containers` with the above configuration and bind it to the appropriate space or,
+to give all started apps access, bind to the `default-running` ASG set and restart your apps. Example:
+
+```json
+[
+  {
+    "protocol": "tcp",
+    "destination": "ASSIGNED_NETWORK",
+    "ports": "6379,16379"
+  }
+]
+```
+
+
+## <a id="validation"></a>Validating the Installation
+
+Smoke tests run as part of <%= vars.product_short %> installation to verify that the installation succeeded.
+For more information, see [<%= vars.product_full %> Smoke Tests](./smoke-tests.html).
+
+
+## <a id="uninstall"></a>Uninstall <%= vars.product_short %>
+
+To uninstall <%= vars.product_short %>:
+
+1. In the <%= vars.ops_manager %> Installation dashboard, click the trash can icon in the lower-right corner of the <%= vars.product_short %> tile.
+1. Confirm the product was deleted.
+1. If you are using <%= vars.ops_manager %> v2.3 or later, click **Review Pending Changes**.
+For more information about this <%= vars.ops_manager %> page, see
+[Reviewing Pending Product Changes](https://docs.pivotal.io/platform/customizing/review-pending-changes.html).<br><br>
+1. Click **Apply Changes**.

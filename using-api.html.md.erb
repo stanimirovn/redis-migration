@@ -1,0 +1,128 @@
+---
+title: Using the Config API
+owner: London Services
+---
+
+This topic describes how to use the Config API feature for <%= vars.product_full %>
+on-demand service instances.
+
+## <a id='overview'></a> Overview
+
+Config API adds an endpoint to service instances for querying Redis configuration parameters.
+An HTTP GET request to `SERVICE-INSTANCE-BOSH-URL:8080/config/CONFIG-PARAMETER-NAME`
+returns the value of a setting.
+
+## <a id='prerequisites'></a> Prerequisites
+
+Before you can use the Config API, you must select the **Enable Config API**
+checkbox in the <%= vars.product_short %> tile.
+See [Configure On-Demand Service Settings](installing.html#on-demand-config).
+
+## <a id='using'></a> Use the Config API to Query Redis Configuration Parameters
+
+After enabled, the Config API is available at port 8080 on the Redis service instance.
+You can query it from a Cloud Foundry app.
+
+To query Redis configuration parameters:
+
+1. Get the hostname of the service instance by running:
+
+    ```
+    cf env APP-NAME
+    ```
+
+    For example:
+
+    <pre class="terminal">
+    $ cf env redis-example-app
+
+    Getting env variables for app redis-example-app in org system / space pivotal-services as admin...
+    OK
+
+    System-Provided:
+    {
+    "VCAP_SERVICES": {
+      "p.redis": [
+         {
+            "binding_guid": "1d93f665-bb9e-493d-9c23-ea577f22a6d1",
+            "binding_name": null,
+            "credentials": {
+               "host": "q-s0.redis-instance.pictonblue-services-subnet.service-instance-30708f54-d8be-45f7-80a6-e587337233aa.bosh", "password": "5ft5I2aXZE7eXS1gjEB5DS7Izz859d",
+               "port": 6379,
+               "tls_port": 16379,
+               "tls_versions": [
+                  "tlsv1.2",
+                  "tlsv1.3"
+               ]
+            },
+         ...
+         }
+      ]
+    }
+    </pre>
+
+1. Query the Redis configuration parameter by running:
+
+    ```
+    cf ssh APP-NAME -c "curl HOST-NAME:8080/config/CONFIG-PARAMETER-NAME" 2>/dev/null
+    ```
+
+    Where:
+    - `APP-NAME`
+    - `HOST-NAME`
+    - `CONFIG-PARAMETER-NAME`
+
+    For example:
+
+    <pre class="terminal">
+    $ cf ssh redis-example-app \
+      -c "curl q-s0.redis-instance.pictonblue-services-subnet.service-instance-30708f54-d8be-45f7-80a6-e587337233aa.bosh:8080/config/port" 2>/dev/null
+
+    6379
+    </pre>
+
+## <a id='parameters'></a> Parameters You Can Query
+
+You can query any parameters except for credentials such as `requirepass`, `masterauth`, or `masteruser`.
+The following are some configuration parameters you can query.
+
+### <a id='redis'></a> Redis Properties
+
+You can query the following Redis properties:
+
+- daemonize
+- port
+
+### <a id='logging-parameters'></a> Logging
+
+You can query the following logging parameters:
+
+- logfile
+- syslog-enabled
+- syslog-facility
+- syslog-ident
+
+### <a id='persistence-parameters'></a> Persistence
+
+You can query the following persistence parameters:
+
+- appendfilename
+- appendonly
+- dbfilename
+- dir
+
+### <a id='arbitrary-parameters'></a> Arbitrary Parameters
+
+You can query the following arbitrary parameters:
+
+- maxmemory-policy
+- slowlog-log-slower-than
+- slowlog-max-len
+
+### <a id='plan-properties'></a> Plan Properties
+
+You can query the following plan properties:
+
+- maxclients
+- tcp-keepalive
+- timeout
