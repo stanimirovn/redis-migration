@@ -210,45 +210,17 @@ The following errors are specific to <%= vars.product_short %>:
   </tr>
 </table>
 
-<a name="err-unknown-command"></a>
-<table class="nice">
-  <style>
-    main table {
-      table-layout: fixed;
-    }
-  </style>
-  <col width="20%">
-  <col width="80%">
-  <tr>
-  <th colspan="2" style="text-align: left;">
-    <br>
-    Unknown Command Error
-    <br><br>
-  </th>
-  </tr>
-  <tr>
-    <th>Symptom</th>
-    <td>
-      <p>
-        You receive the following error message when running <code>redis-cli COMMAND</code> or issuing
-        a command using another Redis client:
-      </p>
-      <pre class="terminal">-ERR unknown command</pre>
-    </td>
-  </tr>
-  <tr>
-    <th>Cause</th>
-    <td>
-      For security reasons, certain commands such as <code>CONFIG</code>,
-      <code>SAVE</code>, <code>BGSAVE</code> and <code>ACL</code>
-      are not available by default.
-    </td>
-  </tr>
-  <tr>
-    <th style="vertical-align: top; padding-top: 1em;">Solution</th>
-    <td>Talk to your operator about the availability of the command.</td>
-  </tr>
-</table>
+<%= partial vars.path_to_partials + '/troubleshoot-template', locals: {
+    id: 'err-unknown-command',
+    description: 'Unknown Command Error',
+    symptom: '<p>You receive the following error message when running `redis-cli COMMAND` or issuing
+a command using another Redis client:</p>
+<pre class="terminal">-ERR unknown command</pre>',
+    cause: 'For security reasons, certain commands such as <code>CONFIG</code>,
+<code>SAVE</code>, and <code>BGSAVE</code>
+are not available by default.',
+    solution: 'Talk to your operator about the availability of the command.'
+} %>
 
 ## <a id="techniques"></a> Techniques for Troubleshooting
 
